@@ -129,7 +129,7 @@ pub struct ChunkMesh {
     pub indices: Vec<u32>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Vertex {
     pub pos: [f32; 3],
     pub normal: [f32; 3],

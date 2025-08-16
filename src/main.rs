@@ -1,24 +1,20 @@
-use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 use egui_glium::{EguiGlium, egui_winit::egui};
 use glam::*;
 use glium::{
-    BackfaceCullingMode, Depth, DepthTest, DrawParameters, IndexBuffer, Program, Surface,
-    Texture2d, VertexBuffer,
     backend::glutin::SimpleWindowBuilder,
-    index::PrimitiveType,
-    texture::RawImage2d,
-    uniforms::{MagnifySamplerFilter, MinifySamplerFilter},
     winit::{
-        event::{Event, WindowEvent},
-        event_loop::EventLoop,
+        application::ApplicationHandler,
+        event::WindowEvent,
+        event_loop::{ActiveEventLoop, EventLoop},
+        window::WindowId,
     },
 };
-use image::ImageFormat;
 
 use crate::{
-    mesher::{Chunk, ChunkMesh},
-    utils::{generate_block_at, vec3_to_index},
+    ecs::*,
+    render::{Meshes, Window},
 };
 
 #[macro_use]
@@ -30,53 +26,86 @@ const FRAGMENT_SHADER: &str = include_str!("../assets/shaders/fragment.glsl");
 const CHUNK_SIZE: i32 = 16;
 const CHUNK_HEIGHT: i32 = 16;
 
+mod ecs;
 mod mesher;
+mod render;
 mod utils;
 
-#[derive(Clone, Copy)]
-pub struct Transform {
-    pub translation: Vec3,
-    pub rotation: Quat,
-    pub scale: Vec3,
+pub struct MyApp {
+    world: World,
+    last_update: Instant,
+    fu_accumulator: Duration,
+    fixed_dt: Duration,
+    startup_schedule: Schedule,
+    update_schedule: Schedule,
+    fixed_update_schedule: Schedule,
+    render_schedule: Schedule,
 }
 
-impl Transform {
-    pub const DEFAULT: Self = Self::from_translation(Vec3::ZERO);
+#[derive(Event)]
+pub struct WindowEventECS(WindowEvent);
 
-    #[inline]
-    pub const fn from_translation(translation: Vec3) -> Self {
-        Self {
-            translation,
-            rotation: Quat::IDENTITY,
-            scale: Vec3::ONE,
+impl ApplicationHandler for MyApp {
+    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
+        self.world.clear_all();
+    }
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        let (window, display) = SimpleWindowBuilder::new()
+            .with_title("FerrisCraft GL")
+            .with_inner_size(1280, 720)
+            .build(event_loop);
+
+        let egui = EguiGlium::new(egui::ViewportId::ROOT, &display, &window, &event_loop);
+        self.world.init_resource::<Events<WindowEventECS>>();
+        self.world.insert_non_send_resource(Window {
+            winit_window: window,
+            display,
+        });
+        self.world.insert_non_send_resource(egui);
+        self.world.insert_non_send_resource(Meshes(Vec::new()));
+
+        self.startup_schedule.add_systems(render::render_setup);
+        self.startup_schedule.run(&mut self.world);
+
+        self.render_schedule.add_systems(render::render_update);
+    }
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        self.world
+            .non_send_resource_mut::<Window>()
+            .winit_window
+            .request_redraw()
+    }
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        match event {
+            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::RedrawRequested => {
+                let now = Instant::now();
+                self.fu_accumulator += now.duration_since(self.last_update);
+                self.last_update = now;
+
+                while self.fu_accumulator >= self.fixed_dt {
+                    self.fixed_update_schedule.run(&mut self.world);
+                    self.fu_accumulator -= self.fixed_dt;
+                }
+
+                self.update_schedule.run(&mut self.world);
+                self.render_schedule.run(&mut self.world);
+            }
+            WindowEvent::Resized(window_size) => {
+                self.world
+                    .non_send_resource_mut::<Window>()
+                    .display
+                    .resize(window_size.into());
+            }
+            _ => (),
         }
-    }
-    #[inline]
-    pub fn from_xyz(x: f32, y: f32, z: f32) -> Self {
-        Self::from_translation(vec3(x, y, z))
-    }
-    #[inline]
-    pub fn with_rotation(mut self, rotation: Quat) -> Self {
-        self.rotation = rotation;
-        self
-    }
-    #[inline]
-    pub fn with_scale(mut self, scale: Vec3) -> Self {
-        self.scale = scale;
-        self
-    }
-    #[inline]
-    pub fn from_mat4(mat4: Mat4) -> Self {
-        let (scale, rotation, translation) = mat4.to_scale_rotation_translation();
-        Self {
-            translation,
-            rotation,
-            scale,
-        }
-    }
-    #[inline]
-    pub fn as_mat4(&self) -> Mat4 {
-        Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.translation)
+        self.world.send_event(WindowEventECS(event));
+        // window.request_redraw();
     }
 }
 
@@ -84,122 +113,18 @@ impl Transform {
 fn main() {
     let event_loop = EventLoop::new().expect("couldn't create event loop");
 
-    let (window, display) = SimpleWindowBuilder::new()
-        .with_title("FerrisCraft GL")
-        .with_inner_size(1280, 720)
-        .build(&event_loop);
+    let mut app = MyApp {
+        world: World::new(),
+        last_update: Instant::now(),
+        fu_accumulator: Duration::ZERO,
+        fixed_dt: Duration::from_secs_f32(1.0 / 64.0),
+        startup_schedule: Schedule::new(Startup),
+        update_schedule: Schedule::new(Update),
+        fixed_update_schedule: Schedule::new(FixedUpdate),
+        render_schedule: Schedule::new(Render),
+    };
 
-    let mut egui = EguiGlium::new(egui::ViewportId::ROOT, &display, &window, &event_loop);
-
-    let mut chunk = Chunk::new(IVec3::ZERO);
-    for y in 0..CHUNK_HEIGHT {
-        for x in 0..CHUNK_SIZE {
-            for z in 0..CHUNK_SIZE {
-                chunk.blocks[vec3_to_index(IVec3::new(x, y, z))] =
-                    generate_block_at(ivec3(x, y, z), rand::random_range(7..16));
-            }
-        }
-    }
-    let chunks = HashMap::from([(IVec3::ZERO, chunk.clone())]);
-    let mesh = ChunkMesh::default().build(&chunk, &chunks).unwrap();
-
-    let index_buffer =
-        IndexBuffer::new(&display, PrimitiveType::TrianglesList, &mesh.indices).unwrap();
-
-    let image = image::load(
-        std::io::Cursor::new(std::fs::read("assets/atlas.png").unwrap()),
-        ImageFormat::Png,
-    )
-    .unwrap()
-    .to_rgba8();
-    let image_dimensions = image.dimensions();
-    let image = RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
-
-    let texture = Texture2d::new(&display, image).unwrap();
-    let sampler = texture
-        .sampled()
-        .magnify_filter(MagnifySamplerFilter::Nearest)
-        .minify_filter(MinifySamplerFilter::NearestMipmapNearest);
-
-    let vertex_buffer = VertexBuffer::new(&display, &mesh.vertices).unwrap();
-
-    let program = Program::from_source(&display, VERTEX_SHADER, FRAGMENT_SHADER, None).unwrap();
-
-    let mut chunk_transform = Transform::from_translation(vec3(-0.2, -0.2, 0.8));
-    let mut camera_transform = Transform::from_translation(vec3(0.0, 0.0, 2.0));
-    let mut light_transform = Transform::DEFAULT;
-    let mut fov = 60.0_f32;
-
-    event_loop
-        .run(move |event, window_target| {
-            match event {
-                Event::WindowEvent { event, .. } => {
-                    let _ = egui.on_event(&window, &event);
-                    match event {
-                        WindowEvent::CloseRequested => window_target.exit(),
-                        WindowEvent::RedrawRequested => {
-                            let mut target = display.draw();
-                            target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
-
-                            let (width, height) = target.get_dimensions();
-                            let perspective = Mat4::perspective_rh_gl(
-                                fov.to_radians(),
-                                width as f32 / height as f32,
-                                0.1,
-                                1024.0,
-                            )
-                            .to_cols_array_2d();
-
-                            let uniforms = uniform! {
-                                model: chunk_transform.as_mat4().to_cols_array_2d(),
-                                view: camera_transform.as_mat4().inverse().to_cols_array_2d(),
-                                perspective: perspective,
-                                tex: sampler,
-                                u_light: (light_transform.rotation * Vec3::NEG_Z).normalize().to_array(),
-                            };
-
-                            let params = DrawParameters {
-                                depth: Depth {
-                                    test: DepthTest::IfLess,
-                                    write: true,
-                                    ..Default::default()
-                                },
-                                backface_culling: BackfaceCullingMode::CullCounterClockwise,
-                                ..Default::default()
-                            };
-
-                            target
-                                .draw(&vertex_buffer, &index_buffer, &program, &uniforms, &params)
-                                .unwrap();
-
-                            egui.run(&window, |ctx| {
-                                egui::Window::new("change transforms").show(ctx, |ui| {
-                                    ui.add(
-                    egui::DragValue::new(&mut fov)
-                        .speed(0.1)
-                        .range(0.1..=179.9),
-                );
-                                    egui_display_transform("chunk", ui, &mut chunk_transform);
-                                    egui_display_transform("camera", ui, &mut camera_transform);
-                                    egui_display_transform("light", ui, &mut light_transform);
-                                });
-                            });
-                            egui.paint(&display, &mut target);
-                            target.finish().unwrap();
-                        }
-                        WindowEvent::Resized(window_size) => {
-                            display.resize(window_size.into());
-                        }
-                        _ => (),
-                    }
-                }
-                Event::AboutToWait => {
-                    window.request_redraw();
-                }
-                _ => (),
-            };
-        })
-        .ok();
+    event_loop.run_app(&mut app).ok();
 }
 
 fn egui_display_transform(label: &str, ui: &mut egui::Ui, transform: &mut Transform) {
