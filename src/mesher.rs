@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use glam::{IVec3, Vec2, Vec3, vec2, vec3};
+use glam::*;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
@@ -48,17 +48,17 @@ pub enum Direction {
 }
 
 impl Direction {
-    pub const NORMALS: &[Vec3; 6] = &[
-        vec3(-1.0, 0.0, 0.0), // Left
-        vec3(1.0, 0.0, 0.0),  // Right
-        vec3(0.0, -1.0, 0.0), // Bottom
-        vec3(0.0, 1.0, 0.0),  // Top
-        vec3(0.0, 0.0, -1.0), // Back
-        vec3(0.0, 0.0, 1.0),  // Front
+    pub const NORMALS: &[[f32; 3]; 6] = &[
+        [-1.0, 0.0, 0.0], // Left
+        [1.0, 0.0, 0.0],  // Right
+        [0.0, -1.0, 0.0], // Bottom
+        [0.0, 1.0, 0.0],  // Top
+        [0.0, 0.0, -1.0], // Back
+        [0.0, 0.0, 1.0],  // Front
     ];
 
     #[inline]
-    pub fn as_vec3(self) -> Vec3 {
+    pub fn as_vec3(self) -> [f32; 3] {
         Self::NORMALS[self as usize]
     }
 
@@ -75,7 +75,7 @@ impl Direction {
     }
 
     #[inline]
-    pub fn get_uvs(self, block: Block) -> [Vec2; 4] {
+    pub fn get_uvs(self, block: Block) -> [[f32; 2]; 4] {
         const ATLAS_SIZE_X: f32 = 1.0;
         const ATLAS_SIZE_Y: f32 = 10.0;
 
@@ -89,10 +89,10 @@ impl Direction {
         );
 
         let base = [
-            vec2(pos.x, pos.y + 1.0 / ATLAS_SIZE_Y),
-            vec2(pos.x, pos.y),
-            vec2(pos.x + 1.0 / ATLAS_SIZE_X, pos.y),
-            vec2(pos.x + 1.0 / ATLAS_SIZE_X, pos.y + 1.0 / ATLAS_SIZE_Y),
+            [pos.x, pos.y + 1.0 / ATLAS_SIZE_Y],
+            [pos.x, pos.y],
+            [pos.x + 1.0 / ATLAS_SIZE_X, pos.y],
+            [pos.x + 1.0 / ATLAS_SIZE_X, pos.y + 1.0 / ATLAS_SIZE_Y],
         ];
         let rotate_90 = [base[3], base[0], base[1], base[2]];
         let rotate_180 = [base[2], base[3], base[0], base[1]];
@@ -131,10 +131,12 @@ pub struct ChunkMesh {
 
 #[derive(Clone, Copy)]
 pub struct Vertex {
-    pub pos: Vec3,
-    pub normal: Direction,
-    pub uv: Vec2,
+    pub pos: [f32; 3],
+    pub normal: [f32; 3],
+    pub uv: [f32; 2],
 }
+
+implement_vertex!(Vertex, pos, normal, uv);
 
 impl ChunkMesh {
     pub fn build(mut self, chunk: &Chunk, chunks: &HashMap<IVec3, Chunk>) -> Option<Self> {
@@ -217,8 +219,8 @@ impl ChunkMesh {
             .enumerate()
         {
             self.vertices.push(Vertex {
-                pos: Vec3::from_array(corner),
-                normal: dir,
+                pos: corner,
+                normal: dir.as_vec3(),
                 uv: uvs[i],
             });
         }
