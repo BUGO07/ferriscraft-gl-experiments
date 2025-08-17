@@ -1,80 +1,48 @@
 use std::collections::HashMap;
 
-use crate::{
-    CHUNK_HEIGHT, CHUNK_SIZE, FRAGMENT_SHADER, VERTEX_SHADER, WindowEventECS,
-    ecs::*,
-    egui_display_transform,
-    mesher::{Chunk, ChunkMesh, Vertex},
-    utils::{generate_block_at, vec3_to_index},
-};
-use egui_glium::{EguiGlium, egui_winit::egui};
-use glam::*;
+use egui_glium::EguiGlium;
 use glium::{
-    BackfaceCullingMode, Depth, DepthTest, Display, DrawParameters, IndexBuffer, Program, Surface,
+    BackfaceCullingMode, Depth, DepthTest, DrawParameters, IndexBuffer, Program, Surface,
     Texture2d, VertexBuffer,
-    glutin::surface::WindowSurface,
     index::PrimitiveType,
     texture::RawImage2d,
     uniforms::{MagnifySamplerFilter, MinifySamplerFilter},
 };
 use image::ImageFormat;
 
-pub struct Window {
-    pub winit_window: glium::winit::window::Window,
-    pub display: Display<WindowSurface>,
-}
-
-#[derive(Debug)]
-pub struct Meshes(pub Vec<Mesh>);
-
-#[derive(Debug)]
-pub struct Mesh {
-    pub program: Program,
-    pub texture: Texture2d,
-    pub vertex_buffer: VertexBuffer<Vertex>,
-    pub index_buffer: IndexBuffer<u32>,
-}
+use crate::{
+    CHUNK_SIZE, FRAGMENT_SHADER, SEA_LEVEL, VERTEX_SHADER,
+    ecs::*,
+    mesher::{Chunk, ChunkMesh},
+    utils::{frustum_planes, generate_block_at, should_cull, vec3_to_index},
+};
 
 pub fn render_setup(
     mut commands: Commands,
     window: NonSend<Window>,
     mut meshes: NonSendMut<Meshes>,
+    mut materials: NonSendMut<Materials>,
 ) {
-    commands.spawn((
-        ChunkEntity,
-        Transform::from_translation(vec3(-0.2, -0.2, 0.8)),
-    ));
+    // Camera
     commands.spawn((
         Camera3d {
             fov: 60.0,
             near: 0.1,
             far: 1024.0,
         },
-        Transform::from_translation(vec3(0.0, 0.0, 2.0)),
+        Transform::from_xyz(0.0, (4 * CHUNK_SIZE + 10) as f32, 5.5)
+            .looking_at(Vec3::Y * (8 * CHUNK_SIZE) as f32, Vec3::Y),
     ));
+
+    // Directional light
     commands.spawn((
         DirectionalLight {
-            // TODO: implement
             illuminance: 1000.0,
         },
-        Transform::DEFAULT,
+        Transform::from_xyz(3.0, 5.0, 2.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 
-    let mut chunk = Chunk::new(IVec3::ZERO);
-    for y in 0..CHUNK_HEIGHT {
-        for x in 0..CHUNK_SIZE {
-            for z in 0..CHUNK_SIZE {
-                chunk.blocks[vec3_to_index(IVec3::new(x, y, z))] =
-                    generate_block_at(ivec3(x, y, z), rand::random_range(7..16));
-            }
-        }
-    }
-    let chunks = HashMap::from([(IVec3::ZERO, chunk.clone())]);
-    let mesh = ChunkMesh::default().build(&chunk, &chunks).unwrap();
-
-    let index_buffer =
-        IndexBuffer::new(&window.display, PrimitiveType::TrianglesList, &mesh.indices).unwrap();
-
+    // Shared material / texture
     let image = image::load(
         std::io::Cursor::new(std::fs::read("assets/atlas.png").unwrap()),
         ImageFormat::Png,
@@ -83,51 +51,80 @@ pub fn render_setup(
     .to_rgba8();
     let image_dimensions = image.dimensions();
     let image = RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
-
-    let texture = Texture2d::new(&window.display, image).unwrap();
-
-    let vertex_buffer = VertexBuffer::new(&window.display, &mesh.vertices).unwrap();
-
-    meshes.0.push(Mesh {
+    let texture = Texture2d::new(&window.gl_context, image).unwrap();
+    let material = materials.add(Material::new(
+        Program::from_source(&window.gl_context, VERTEX_SHADER, FRAGMENT_SHADER, None).unwrap(),
         texture,
-        index_buffer,
-        vertex_buffer,
-        program: Program::from_source(&window.display, VERTEX_SHADER, FRAGMENT_SHADER, None)
-            .unwrap(),
-    });
-}
+    ));
 
-#[allow(clippy::type_complexity)]
+    const CHUNK_SIZE_VEC: Vec3 = Vec3::splat(CHUNK_SIZE as f32);
+
+    let mut chunks = HashMap::new();
+
+    // Spawn chunks individually
+    for cy in 0..4 {
+        for cz in -8..8 {
+            for cx in -8..8 {
+                let chunk_pos = IVec3::new(cx, cy, cz);
+                let mut chunk = Chunk::new(chunk_pos);
+
+                for y in 0..CHUNK_SIZE {
+                    for z in 0..CHUNK_SIZE {
+                        for x in 0..CHUNK_SIZE {
+                            let block_pos = ivec3(x, y, z);
+                            chunk.blocks[vec3_to_index(block_pos)] = generate_block_at(
+                                block_pos + chunk_pos * CHUNK_SIZE,
+                                rand::random_range(SEA_LEVEL..(CHUNK_SIZE * 8)),
+                            );
+                        }
+                    }
+                }
+
+                chunks.insert(chunk_pos, chunk);
+            }
+        }
+    }
+
+    for (chunk_pos, chunk) in &chunks {
+        if let Some(mesh_data) = ChunkMesh::default().build(chunk, &chunks) {
+            let vertex_buffer = VertexBuffer::new(&window.gl_context, &mesh_data.vertices).unwrap();
+            let index_buffer = IndexBuffer::new(
+                &window.gl_context,
+                PrimitiveType::TrianglesList,
+                &mesh_data.indices,
+            )
+            .unwrap();
+
+            let mesh_id = meshes.add(Mesh::new(vertex_buffer, index_buffer));
+
+            commands.spawn((
+                mesh_id,
+                material,
+                Transform::from_translation((chunk_pos * CHUNK_SIZE).as_vec3()),
+                Aabb::new(Vec3::ZERO, CHUNK_SIZE_VEC),
+            ));
+        }
+    }
+}
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn render_update(
     window: NonSend<Window>,
     meshes: NonSend<Meshes>,
-    mut chunk_transform: Single<
-        &mut Transform,
-        (
-            With<ChunkEntity>,
-            Without<Camera3d>,
-            Without<DirectionalLight>,
-        ),
+    materials: NonSend<Materials>,
+    mesh_entities: Query<
+        (&Transform, &Mesh3d, &MeshMaterial, &Aabb),
+        (Without<Camera3d>, Without<DirectionalLight>),
     >,
-    camera_query: Single<
-        (&mut Transform, &mut Camera3d),
-        (Without<ChunkEntity>, Without<DirectionalLight>),
-    >,
-    light_query: Single<
-        (&mut Transform, &mut DirectionalLight),
-        (Without<ChunkEntity>, Without<Camera3d>),
-    >,
+    camera_query: Single<(&mut Transform, &Camera3d), (Without<Mesh3d>, Without<DirectionalLight>)>,
+    light_query: Single<(&Transform, &DirectionalLight), (Without<Mesh3d>, Without<Camera3d>)>,
+    debug_info: Option<ResMut<DebugInfo>>,
     mut egui: NonSendMut<EguiGlium>,
-    mut window_events: EventReader<WindowEventECS>,
 ) {
-    for event in window_events.read() {
-        let _ = egui.on_event(&window.winit_window, &event.0);
-    }
-    let mut target = window.display.draw();
+    let mut target = window.gl_context.draw();
     target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
 
-    let (mut camera_transform, mut camera) = camera_query.into_inner();
-    let (mut light_transform, mut _light) = light_query.into_inner();
+    let (camera_transform, camera) = camera_query.into_inner();
+    let (light_transform, _light) = light_query.into_inner();
 
     let (width, height) = target.get_dimensions();
     let perspective = Mat4::perspective_rh_gl(
@@ -135,53 +132,64 @@ pub fn render_update(
         width as f32 / height as f32,
         camera.near,
         camera.far,
-    )
-    .to_cols_array_2d();
+    );
 
-    let Mesh {
-        index_buffer,
-        vertex_buffer,
-        program,
-        texture,
-    } = &meshes.0[0];
-    let sampler = texture
-        .sampled()
-        .magnify_filter(MagnifySamplerFilter::Nearest)
-        .minify_filter(MinifySamplerFilter::NearestMipmapNearest);
+    let view = camera_transform.as_mat4().inverse();
+    let vp: Mat4 = perspective * view;
+    let frustum = frustum_planes(&vp);
 
-    let uniforms = uniform! {
-        model: chunk_transform.as_mat4().to_cols_array_2d(),
-        view: camera_transform.as_mat4().inverse().to_cols_array_2d(),
-        perspective: perspective,
-        tex: sampler,
-        u_light: (light_transform.rotation * Vec3::NEG_Z).normalize().to_array(),
-    };
+    let mut draw_calls = 0;
+    let mut vertices = 0;
+    let mut indices = 0;
 
-    let params = DrawParameters {
-        depth: Depth {
-            test: DepthTest::IfLess,
-            write: true,
+    for (chunk_transform, mesh_id, material_id, aabb) in mesh_entities.iter() {
+        if should_cull(&frustum, chunk_transform.translation, aabb) {
+            continue;
+        }
+        let Mesh {
+            vertex_buffer,
+            index_buffer,
+        } = &meshes.0[mesh_id.0];
+        let Material { program, texture } = &materials.0[material_id.0];
+
+        let sampler = texture
+            .sampled()
+            .magnify_filter(MagnifySamplerFilter::Nearest)
+            .minify_filter(MinifySamplerFilter::NearestMipmapNearest);
+
+        let uniforms = uniform! {
+            model: chunk_transform.as_mat4().to_cols_array_2d(),
+            view: view.to_cols_array_2d(),
+            perspective: perspective.to_cols_array_2d(),
+            tex: sampler,
+            u_light: (light_transform.rotation * Vec3::NEG_Z).normalize().to_array(),
+        };
+
+        let params = DrawParameters {
+            depth: Depth {
+                test: DepthTest::IfLess,
+                write: true,
+                ..Default::default()
+            },
+            backface_culling: BackfaceCullingMode::CullClockwise,
             ..Default::default()
-        },
-        backface_culling: BackfaceCullingMode::CullCounterClockwise,
-        ..Default::default()
-    };
-    target
-        .draw(vertex_buffer, index_buffer, program, &uniforms, &params)
-        .unwrap();
+        };
 
-    egui.run(&window.winit_window, |ctx| {
-        egui::Window::new("change transforms").show(ctx, |ui| {
-            ui.add(
-                egui::DragValue::new(&mut camera.fov)
-                    .speed(0.1)
-                    .range(0.1..=179.9),
-            );
-            egui_display_transform("chunk", ui, &mut chunk_transform);
-            egui_display_transform("camera", ui, &mut camera_transform);
-            egui_display_transform("light", ui, &mut light_transform);
-        });
-    });
-    egui.paint(&window.display, &mut target);
+        vertices += vertex_buffer.len();
+        indices += index_buffer.len();
+        draw_calls += 1;
+
+        target
+            .draw(vertex_buffer, index_buffer, program, &uniforms, &params)
+            .unwrap();
+    }
+
+    if let Some(mut debug_info) = debug_info {
+        debug_info.vertices = vertices;
+        debug_info.indices = indices;
+        debug_info.draw_calls = draw_calls;
+    }
+
+    egui.paint(&window.gl_context, &mut target);
     target.finish().unwrap();
 }
