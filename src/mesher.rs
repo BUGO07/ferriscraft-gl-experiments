@@ -4,7 +4,7 @@ use glam::*;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
-    CHUNK_HEIGHT, CHUNK_SIZE,
+    CHUNK_SIZE,
     utils::{Quad, index_to_vec3, vec3_to_index},
 };
 
@@ -135,7 +135,6 @@ pub struct Vertex {
     pub normal: [f32; 3],
     pub uv: [f32; 2],
 }
-
 implement_vertex!(Vertex, pos, normal, uv);
 
 impl ChunkMesh {
@@ -144,9 +143,10 @@ impl ChunkMesh {
 
         let left_chunk = chunks.get(&(chunk_pos + IVec3::new(-1, 0, 0)));
         let back_chunk = chunks.get(&(chunk_pos + IVec3::new(0, 0, -1)));
+        let down_chunk = chunks.get(&(chunk_pos + IVec3::new(0, -1, 0)));
 
         // parallelized (thanks rayon)
-        let mesh_parts: Vec<ChunkMesh> = (0..CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE)
+        let mesh_parts: Vec<ChunkMesh> = (0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
             .into_par_iter()
             .filter_map(|i| {
                 let mut local_mesh = ChunkMesh::default();
@@ -156,7 +156,8 @@ impl ChunkMesh {
 
                 let current = *unsafe { chunk.blocks.get_unchecked(i as usize) };
 
-                let (back, left, down) = chunk.get_adjacent_blocks(pos, left_chunk, back_chunk);
+                let (back, left, down) =
+                    chunk.get_adjacent_blocks(pos, left_chunk, back_chunk, down_chunk);
 
                 if !current.is_air() {
                     if left.is_air() {
@@ -213,7 +214,7 @@ impl ChunkMesh {
     #[inline(always)]
     pub fn push_face(&mut self, dir: Direction, pos: Vec3, block: Block) {
         let uvs = dir.get_uvs(block);
-        for (i, corner) in Quad::from_direction(dir, pos * 0.03, Vec3::ONE * 0.03)
+        for (i, corner) in Quad::from_direction(dir, pos, Vec3::ONE)
             .corners
             .into_iter()
             .enumerate()
@@ -232,7 +233,7 @@ impl Chunk {
     pub fn new(pos: IVec3) -> Self {
         Chunk {
             pos,
-            blocks: vec![Block::Air; (CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE) as usize],
+            blocks: vec![Block::Air; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize],
         }
     }
 
@@ -242,25 +243,21 @@ impl Chunk {
         pos: IVec3,
         left_chunk: Option<&Chunk>,
         back_chunk: Option<&Chunk>,
+        down_chunk: Option<&Chunk>,
     ) -> (Block, Block, Block) {
         let x = pos.x;
         let y = pos.y;
         let z = pos.z;
-
-        if !(0..CHUNK_HEIGHT).contains(&y) {
-            return (Block::Air, Block::Air, Block::Air);
-        }
 
         let get_block = |dx: i32, dy: i32, dz: i32, fallback: Option<&Chunk>| -> Block {
             let nx = x + dx;
             let ny = y + dy;
             let nz = z + dz;
 
-            if !(0..CHUNK_HEIGHT).contains(&ny) {
-                return Block::Air;
-            }
-
-            if (0..CHUNK_SIZE).contains(&nx) && (0..CHUNK_SIZE).contains(&nz) {
+            if (0..CHUNK_SIZE).contains(&nx)
+                && (0..CHUNK_SIZE).contains(&ny)
+                && (0..CHUNK_SIZE).contains(&nz)
+            {
                 return *unsafe {
                     self.blocks
                         .get_unchecked(vec3_to_index(IVec3::new(nx, ny, nz)))
@@ -268,12 +265,19 @@ impl Chunk {
             }
 
             let mut lx = nx;
+            let mut ly = ny;
             let mut lz = nz;
 
             if nx < 0 {
                 lx += CHUNK_SIZE;
             } else if nx >= CHUNK_SIZE {
                 lx -= CHUNK_SIZE;
+            }
+
+            if ny < 0 {
+                ly += CHUNK_SIZE;
+            } else if ny >= CHUNK_SIZE {
+                ly -= CHUNK_SIZE;
             }
 
             if nz < 0 {
@@ -286,7 +290,7 @@ impl Chunk {
                 return *unsafe {
                     chunk
                         .blocks
-                        .get_unchecked(vec3_to_index(IVec3::new(lx, ny, lz)))
+                        .get_unchecked(vec3_to_index(IVec3::new(lx, ly, lz)))
                 };
             }
 
@@ -295,7 +299,7 @@ impl Chunk {
 
         let back = get_block(0, 0, -1, back_chunk);
         let left = get_block(-1, 0, 0, left_chunk);
-        let down = get_block(0, -1, 0, None);
+        let down = get_block(0, -1, 0, down_chunk);
 
         (back, left, down)
     }

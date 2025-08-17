@@ -1,7 +1,8 @@
-use glam::{IVec3, Vec3, ivec3};
+use glam::*;
 
 use crate::{
-    CHUNK_HEIGHT, CHUNK_SIZE,
+    CHUNK_SIZE,
+    ecs::Aabb,
     mesher::{Block, Direction},
 };
 
@@ -103,14 +104,63 @@ impl Quad {
 
 #[inline]
 pub fn vec3_to_index(pos: IVec3) -> usize {
-    (pos.x + pos.y * CHUNK_SIZE + pos.z * CHUNK_SIZE * CHUNK_HEIGHT) as usize
+    (pos.x + pos.y * CHUNK_SIZE + pos.z * CHUNK_SIZE * CHUNK_SIZE) as usize
 }
 
 #[inline]
 pub fn index_to_vec3(index: usize) -> IVec3 {
     ivec3(
         index as i32 % CHUNK_SIZE,
-        (index as i32 / CHUNK_SIZE) % CHUNK_HEIGHT,
-        index as i32 / (CHUNK_SIZE * CHUNK_HEIGHT),
+        (index as i32 / CHUNK_SIZE) % CHUNK_SIZE,
+        index as i32 / (CHUNK_SIZE * CHUNK_SIZE),
     )
+}
+
+pub fn should_cull(frustum: &[Vec4; 6], pos: Vec3, aabb: &Aabb) -> bool {
+    for plane in frustum {
+        let mut n_vertex = aabb.min + pos;
+        if plane.x > 0.0 {
+            n_vertex.x = aabb.max.x + pos.x;
+        }
+        if plane.y > 0.0 {
+            n_vertex.y = aabb.max.y + pos.y;
+        }
+        if plane.z > 0.0 {
+            n_vertex.z = aabb.max.z + pos.z;
+        }
+
+        if plane.xyz().dot(n_vertex) + plane.w < 0.0 {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn frustum_planes(view_proj_matrix: &Mat4) -> [Vec4; 6] {
+    let mut planes: [Vec4; 6] = [Vec4::ZERO; 6];
+
+    let row1 = view_proj_matrix.row(0);
+    let row2 = view_proj_matrix.row(1);
+    let row3 = view_proj_matrix.row(2);
+    let row4 = view_proj_matrix.row(3);
+
+    let left = row4 + row1;
+    planes[0] = left;
+
+    let right = row4 - row1;
+    planes[1] = right;
+
+    let bottom = row4 + row2;
+    planes[2] = bottom;
+
+    let top = row4 - row2;
+    planes[3] = top;
+
+    let near = row4 + row3;
+    planes[4] = near;
+
+    let far = row4 - row3;
+    planes[5] = far;
+
+    planes
 }
