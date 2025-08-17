@@ -47,82 +47,6 @@ pub enum Direction {
     Front,
 }
 
-impl Direction {
-    pub const NORMALS: &[[f32; 3]; 6] = &[
-        [-1.0, 0.0, 0.0], // Left
-        [1.0, 0.0, 0.0],  // Right
-        [0.0, -1.0, 0.0], // Bottom
-        [0.0, 1.0, 0.0],  // Top
-        [0.0, 0.0, -1.0], // Back
-        [0.0, 0.0, 1.0],  // Front
-    ];
-
-    #[inline]
-    pub fn as_vec3(self) -> [f32; 3] {
-        Self::NORMALS[self as usize]
-    }
-
-    #[inline]
-    pub fn get_opposite(self) -> Self {
-        match self {
-            Direction::Left => Direction::Right,
-            Direction::Right => Direction::Left,
-            Direction::Bottom => Direction::Top,
-            Direction::Top => Direction::Bottom,
-            Direction::Back => Direction::Front,
-            Direction::Front => Direction::Back,
-        }
-    }
-
-    #[inline]
-    pub fn get_uvs(self, block: Block) -> [[f32; 2]; 4] {
-        const ATLAS_SIZE_X: f32 = 1.0;
-        const ATLAS_SIZE_Y: f32 = 10.0;
-
-        let block_direction = Direction::Top;
-
-        let face_idx = 0.0;
-
-        let pos = vec2(
-            face_idx / ATLAS_SIZE_X,
-            1.0 - ((block as u32 - 1) as f32 / ATLAS_SIZE_Y),
-        );
-
-        let base = [
-            [pos.x, pos.y + 1.0 / ATLAS_SIZE_Y],
-            [pos.x, pos.y],
-            [pos.x + 1.0 / ATLAS_SIZE_X, pos.y],
-            [pos.x + 1.0 / ATLAS_SIZE_X, pos.y + 1.0 / ATLAS_SIZE_Y],
-        ];
-        let rotate_90 = [base[3], base[0], base[1], base[2]];
-        let rotate_180 = [base[2], base[3], base[0], base[1]];
-        let rotate_270 = [base[1], base[2], base[3], base[0]];
-
-        // HOLY BAD CODE
-        use Direction::*;
-        match (block_direction, self) {
-            (Right, Top | Bottom) => base,
-            (Right, Back) => rotate_90,
-            (Right, _) => rotate_270,
-            (Top, Front | Back) => base,
-            (Top, Left) => rotate_90,
-            (Top, _) => rotate_270,
-            (Front, Right | Left) => base,
-            (Front, Bottom) => rotate_90,
-            (Front, _) => rotate_270,
-            (Left, Top | Bottom) => rotate_180,
-            (Left, Back) => rotate_270,
-            (Left, _) => rotate_90,
-            (Bottom, Front | Back) => rotate_180,
-            (Bottom, Left) => rotate_270,
-            (Bottom, _) => rotate_90,
-            (Back, Right | Left) => rotate_180,
-            (Back, Bottom) => rotate_270,
-            (Back, _) => rotate_90,
-        }
-    }
-}
-
 #[derive(Default)]
 pub struct ChunkMesh {
     pub vertices: Vec<Vertex>,
@@ -131,11 +55,10 @@ pub struct ChunkMesh {
 
 #[derive(Clone, Copy, Debug)]
 pub struct Vertex {
-    pub pos: [f32; 3],
-    pub normal: [f32; 3],
-    pub uv: [f32; 2],
+    pub vertex_data: u32,
 }
-implement_vertex!(Vertex, pos, normal, uv);
+
+implement_vertex!(Vertex, vertex_data);
 
 impl ChunkMesh {
     pub fn build(mut self, chunk: &Chunk, chunks: &HashMap<IVec3, Chunk>) -> Option<Self> {
@@ -152,7 +75,6 @@ impl ChunkMesh {
                 let mut local_mesh = ChunkMesh::default();
 
                 let pos = index_to_vec3(i as usize);
-                let local = pos.as_vec3();
 
                 let current = *unsafe { chunk.blocks.get_unchecked(i as usize) };
 
@@ -161,23 +83,23 @@ impl ChunkMesh {
 
                 if !current.is_air() {
                     if left.is_air() {
-                        local_mesh.push_face(Direction::Left, local, current);
+                        local_mesh.push_face(Direction::Left, pos, current);
                     }
                     if back.is_air() {
-                        local_mesh.push_face(Direction::Back, local, current);
+                        local_mesh.push_face(Direction::Back, pos, current);
                     }
                     if down.is_air() {
-                        local_mesh.push_face(Direction::Bottom, local, current);
+                        local_mesh.push_face(Direction::Bottom, pos, current);
                     }
                 } else {
                     if !left.is_air() {
-                        local_mesh.push_face(Direction::Right, local, left);
+                        local_mesh.push_face(Direction::Right, pos, left);
                     }
                     if !back.is_air() {
-                        local_mesh.push_face(Direction::Front, local, back);
+                        local_mesh.push_face(Direction::Front, pos, back);
                     }
                     if !down.is_air() {
-                        local_mesh.push_face(Direction::Top, local, down);
+                        local_mesh.push_face(Direction::Top, pos, down);
                     }
                 }
 
@@ -212,18 +134,20 @@ impl ChunkMesh {
     }
 
     #[inline(always)]
-    pub fn push_face(&mut self, dir: Direction, pos: Vec3, block: Block) {
-        let uvs = dir.get_uvs(block);
-        for (i, corner) in Quad::from_direction(dir, pos, Vec3::ONE)
+    pub fn push_face(&mut self, dir: Direction, pos: IVec3, block: Block) {
+        for (corner, pos) in Quad::from_direction(dir, pos, IVec3::ONE)
             .corners
             .into_iter()
             .enumerate()
         {
-            self.vertices.push(Vertex {
-                pos: corner,
-                normal: dir.as_vec3(),
-                uv: uvs[i],
-            });
+            let vertex_data = pos[0] as u32
+                | (pos[1] as u32) << 6
+                | (pos[2] as u32) << 12
+                | (dir as u32) << 18
+                | (corner as u32) << 21
+                | (block as u32) << 23;
+
+            self.vertices.push(Vertex { vertex_data });
         }
     }
 }

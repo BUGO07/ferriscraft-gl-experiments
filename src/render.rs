@@ -74,7 +74,7 @@ pub fn render_setup(
                             let block_pos = ivec3(x, y, z);
                             chunk.blocks[vec3_to_index(block_pos)] = generate_block_at(
                                 block_pos + chunk_pos * CHUNK_SIZE,
-                                rand::random_range(SEA_LEVEL..(CHUNK_SIZE * 8)),
+                                rand::random_range(SEA_LEVEL..(CHUNK_SIZE * 4 - 1)),
                             );
                         }
                     }
