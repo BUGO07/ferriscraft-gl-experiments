@@ -14,10 +14,11 @@ use glium::{
 use image::ImageFormat;
 
 use crate::{
-    CHUNK_SIZE, FRAGMENT_SHADER, SEA_LEVEL, VERTEX_SHADER,
+    CHUNK_SIZE, SEA_LEVEL, UI_FRAGMENT_SHADER, UI_VERTEX_SHADER, VOXEL_FRAGMENT_SHADER,
+    VOXEL_VERTEX_SHADER,
     ecs::*,
-    mesher::{Chunk, ChunkMesh},
-    utils::{frustum_planes, generate_block_at, should_cull, vec3_to_index},
+    mesher::{Chunk, ChunkMesh, Direction, UIVertex},
+    utils::{Quad, frustum_planes, generate_block_at, should_cull, vec3_to_index},
 };
 
 pub fn render_setup(
@@ -26,7 +27,6 @@ pub fn render_setup(
     mut meshes: NonSendMut<Meshes>,
     mut materials: NonSendMut<Materials>,
 ) {
-    // Camera
     commands.spawn((
         Camera3d {
             fov: 60.0,
@@ -37,7 +37,6 @@ pub fn render_setup(
             .looking_at(Vec3::Y * (8 * CHUNK_SIZE) as f32, Vec3::Y),
     ));
 
-    // Directional light
     commands.spawn((
         DirectionalLight {
             illuminance: 1000.0,
@@ -46,7 +45,22 @@ pub fn render_setup(
             .with_rotation(Quat::from_rotation_x(FRAC_PI_4) * Quat::from_rotation_y(-FRAC_PI_6)),
     ));
 
-    // Shared material / texture
+    commands.spawn(UIRect::new(
+        Val::Percent(0.0),
+        Val::Percent(0.0),
+        Val::Px(80.0),
+        Val::Px(80.0),
+        Vec4::ONE,
+    ));
+
+    commands.spawn(UIRect::new(
+        Val::Percent(50.0),
+        Val::Percent(50.0),
+        Val::Percent(1.0),
+        Val::Percent(1.0),
+        Vec4::ONE,
+    ));
+
     let image = image::load(
         std::io::Cursor::new(std::fs::read("assets/atlas.png").unwrap()),
         ImageFormat::Png,
@@ -57,7 +71,13 @@ pub fn render_setup(
     let image = RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
     let texture = Texture2d::new(&window.gl_context, image).unwrap();
     let material = materials.add(Material::new(
-        Program::from_source(&window.gl_context, VERTEX_SHADER, FRAGMENT_SHADER, None).unwrap(),
+        Program::from_source(
+            &window.gl_context,
+            VOXEL_VERTEX_SHADER,
+            VOXEL_FRAGMENT_SHADER,
+            None,
+        )
+        .unwrap(),
         texture,
     ));
 
@@ -65,7 +85,6 @@ pub fn render_setup(
 
     let mut chunks = HashMap::new();
 
-    // Spawn chunks individually
     for cy in 0..4 {
         for cz in -8..8 {
             for cx in -8..8 {
@@ -110,6 +129,7 @@ pub fn render_setup(
         }
     }
 }
+
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn render_update(
     window: NonSend<Window>,
@@ -121,6 +141,7 @@ pub fn render_update(
     >,
     camera_query: Single<(&mut Transform, &Camera3d), (Without<Mesh3d>, Without<DirectionalLight>)>,
     light_query: Single<(&Transform, &DirectionalLight), (Without<Mesh3d>, Without<Camera3d>)>,
+    ui_query: Query<&UIRect>,
     debug_info: Option<ResMut<DebugInfo>>,
     mut egui: NonSendMut<EguiGlium>,
 ) {
@@ -188,12 +209,65 @@ pub fn render_update(
             .unwrap();
     }
 
+    // ui
+    {
+        let window_size = vec2(width as f32, height as f32);
+
+        let mut verts = Vec::new();
+        let mut inds = Vec::new();
+
+        for ui_item in ui_query.iter() {
+            let quad = Quad::from_direction(
+                Direction::Front,
+                vec3(
+                    ui_item.x.calculate(window_size.x) - 1.0,
+                    1.0 - ui_item.y.calculate(window_size.y),
+                    0.0,
+                ),
+                vec3(
+                    ui_item.width.calculate(window_size.x),
+                    -ui_item.height.calculate(window_size.y),
+                    0.0,
+                ),
+            );
+            verts.extend(quad.corners.iter().map(|c| UIVertex { pos: [c[0], c[1]] }));
+        }
+
+        verts.shrink_to_fit();
+        inds.extend((0..verts.len() / 4).flat_map(|i| {
+            let idx = i as u32 * 4;
+            [idx, idx + 1, idx + 2, idx, idx + 2, idx + 3]
+        }));
+
+        let vertex_buffer = VertexBuffer::new(&window.gl_context, &verts).unwrap();
+        let index_buffer =
+            IndexBuffer::new(&window.gl_context, PrimitiveType::TrianglesList, &inds).unwrap();
+        let program = Program::from_source(
+            &window.gl_context,
+            UI_VERTEX_SHADER,
+            UI_FRAGMENT_SHADER,
+            None,
+        )
+        .unwrap();
+
+        let uniforms = uniform! {};
+
+        let params = DrawParameters::default();
+
+        vertices += vertex_buffer.len();
+        indices += index_buffer.len();
+        draw_calls += 1;
+
+        target
+            .draw(&vertex_buffer, &index_buffer, &program, &uniforms, &params)
+            .unwrap();
+    }
+
     if let Some(mut debug_info) = debug_info {
         debug_info.vertices = vertices;
         debug_info.indices = indices;
         debug_info.draw_calls = draw_calls;
     }
-
     egui.paint(&window.gl_context, &mut target);
     target.finish().unwrap();
 }

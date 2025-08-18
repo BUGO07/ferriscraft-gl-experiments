@@ -45,12 +45,12 @@ pub fn generate_block_at(pos: IVec3, max_y: i32) -> Block {
     // terrain_block
 }
 pub struct Quad {
-    pub corners: [[i32; 3]; 4],
+    pub corners: [[f32; 3]; 4],
 }
 
 impl Quad {
     #[inline]
-    pub fn from_direction(direction: Direction, pos: IVec3, size: IVec3) -> Self {
+    pub fn from_direction(direction: Direction, pos: Vec3, size: Vec3) -> Self {
         let corners = match direction {
             Direction::Left => [
                 [pos.x, pos.y, pos.z],

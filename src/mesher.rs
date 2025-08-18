@@ -49,16 +49,23 @@ pub enum Direction {
 
 #[derive(Default)]
 pub struct ChunkMesh {
-    pub vertices: Vec<Vertex>,
+    pub vertices: Vec<VoxelVertex>,
     pub indices: Vec<u32>,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Vertex {
+pub struct VoxelVertex {
     pub vertex_data: u32,
 }
 
-implement_vertex!(Vertex, vertex_data);
+implement_vertex!(VoxelVertex, vertex_data);
+
+#[derive(Clone, Copy, Debug)]
+pub struct UIVertex {
+    pub pos: [f32; 2],
+}
+
+implement_vertex!(UIVertex, pos);
 
 impl ChunkMesh {
     pub fn build(mut self, chunk: &Chunk, chunks: &HashMap<IVec3, Chunk>) -> Option<Self> {
@@ -135,7 +142,7 @@ impl ChunkMesh {
 
     #[inline(always)]
     pub fn push_face(&mut self, dir: Direction, pos: IVec3, block: Block) {
-        for (corner, pos) in Quad::from_direction(dir, pos, IVec3::ONE)
+        for (corner, pos) in Quad::from_direction(dir, pos.as_vec3(), Vec3::ONE)
             .corners
             .into_iter()
             .enumerate()
@@ -147,7 +154,7 @@ impl ChunkMesh {
                 | (corner as u32) << 21
                 | (block as u32) << 23;
 
-            self.vertices.push(Vertex { vertex_data });
+            self.vertices.push(VoxelVertex { vertex_data });
         }
     }
 }
