@@ -23,7 +23,7 @@ use crate::{
 
 pub fn render_setup(
     mut commands: Commands,
-    window: NonSend<Window>,
+    window: NonSend<NSWindow>,
     mut meshes: NonSendMut<Meshes>,
     mut materials: NonSendMut<Materials>,
 ) {
@@ -132,7 +132,7 @@ pub fn render_setup(
 
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn render_update(
-    window: NonSend<Window>,
+    window: NonSend<NSWindow>,
     meshes: NonSend<Meshes>,
     materials: NonSend<Materials>,
     mesh_entities: Query<

@@ -1,4 +1,4 @@
-#version 140
+#version 330 core
 
 in vec3 v_pos;
 in vec3 v_normal;
@@ -27,7 +27,7 @@ void main() {
     // check if block is water or something and only then apply specular reflection;
     if (v_block == 6u) {
         float specular = pow(max(dot(half_direction, normalize(v_normal)), 0.0), 16.0);
-        final_color = final_color + specular * specular_color * u_light.w / 2500.0; // idk idc
+        final_color += specular * specular_color * u_light.w / 2500.0; // idk idc
     }
 
     color = vec4(final_color, 1.0);
