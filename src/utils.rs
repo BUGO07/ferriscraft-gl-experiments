@@ -1,10 +1,20 @@
 use glam::*;
+use glium::winit::window::CursorGrabMode;
 
 use crate::{
     CHUNK_SIZE,
-    ecs::Aabb,
+    ecs::{Aabb, Window},
     mesher::{Block, Direction},
 };
+
+pub fn set_cursor_grab(window: &mut Window, val: bool) {
+    window.cursor_grab = if val {
+        CursorGrabMode::Locked
+    } else {
+        CursorGrabMode::None
+    };
+    window.cursor_visible = !val;
+}
 
 #[inline]
 pub fn generate_block_at(pos: IVec3, max_y: i32) -> Block {

@@ -6,9 +6,10 @@ use glium::{
     backend::glutin::SimpleWindowBuilder,
     winit::{
         application::ApplicationHandler,
-        event::WindowEvent,
+        event::{DeviceEvent, ElementState, MouseScrollDelta, WindowEvent},
         event_loop::{ActiveEventLoop, EventLoop},
-        window::WindowId,
+        keyboard::PhysicalKey,
+        window::{CursorGrabMode, WindowId},
     },
 };
 
@@ -29,6 +30,7 @@ mod ecs;
 mod events;
 mod inspector;
 mod mesher;
+mod movement;
 mod render;
 mod utils;
 
@@ -40,6 +42,7 @@ pub struct Application {
     startup_schedule: Schedule,
     update_schedule: Schedule,
     fixed_update_schedule: Schedule,
+    post_update_schedule: Schedule,
     render_schedule: Schedule,
 }
 
@@ -54,13 +57,20 @@ impl ApplicationHandler for Application {
             .build(event_loop);
 
         self.world.init_resource::<Events<WindowEventECS>>();
+        self.world.init_resource::<KeyboardInput>();
+        self.world.init_resource::<MouseInput>();
+        self.world.init_resource::<Time>();
+        self.world.insert_resource(Window {
+            cursor_grab: CursorGrabMode::None,
+            cursor_visible: true,
+        });
         self.world.insert_non_send_resource(EguiGlium::new(
             egui::ViewportId::ROOT,
             &display,
             &window,
             &event_loop,
         ));
-        self.world.insert_non_send_resource(Window {
+        self.world.insert_non_send_resource(NSWindow {
             winit_window: window,
             gl_context: display,
         });
@@ -70,17 +80,48 @@ impl ApplicationHandler for Application {
         #[cfg(debug_assertions)]
         self.world.init_resource::<DebugInfo>();
 
-        self.startup_schedule.add_systems(render::render_setup);
+        self.startup_schedule
+            .add_systems((render::render_setup, movement::setup));
         self.startup_schedule.run(&mut self.world);
 
+        self.update_schedule.add_systems(movement::handle_movement);
         self.render_schedule
             .add_systems((inspector::handle_egui, render::render_update).chain());
+        self.post_update_schedule
+            .add_systems((events::handle_input, events::handle_window));
     }
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         self.world
-            .non_send_resource_mut::<Window>()
+            .non_send_resource_mut::<NSWindow>()
             .winit_window
             .request_redraw()
+    }
+    fn device_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        device_id: glium::winit::event::DeviceId,
+        event: glium::winit::event::DeviceEvent,
+    ) {
+        match event {
+            DeviceEvent::MouseMotion { delta } => {
+                let window = self.world.resource::<Window>();
+                if !matches!(window.cursor_grab, CursorGrabMode::None) {
+                    let mut mouse = self.world.resource_mut::<MouseInput>();
+                    mouse.motion.x = delta.0 as f32;
+                    mouse.motion.y = delta.1 as f32;
+                }
+            }
+            DeviceEvent::MouseWheel { delta } => {
+                let mut mouse = self.world.resource_mut::<MouseInput>();
+                mouse.scroll = match delta {
+                    MouseScrollDelta::LineDelta(x, y) => vec2(x, y),
+                    MouseScrollDelta::PixelDelta(pos) => {
+                        vec2(pos.x.signum() as f32, pos.y.signum() as f32)
+                    }
+                };
+            }
+            _ => {}
+        }
     }
     fn window_event(
         &mut self,
@@ -92,7 +133,9 @@ impl ApplicationHandler for Application {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {
                 let now = Instant::now();
-                self.fu_accumulator += now.duration_since(self.last_update);
+                let delta = now.duration_since(self.last_update);
+                self.fu_accumulator += delta;
+                self.world.resource_mut::<Time>().delta = delta;
                 self.last_update = now;
 
                 while self.fu_accumulator >= self.fixed_dt {
@@ -102,14 +145,51 @@ impl ApplicationHandler for Application {
 
                 self.update_schedule.run(&mut self.world);
                 self.render_schedule.run(&mut self.world);
+                self.post_update_schedule.run(&mut self.world);
             }
             WindowEvent::Resized(window_size) => {
                 self.world
-                    .non_send_resource_mut::<Window>()
+                    .non_send_resource_mut::<NSWindow>()
                     .gl_context
                     .resize(window_size.into());
             }
-            _ => (),
+            WindowEvent::KeyboardInput {
+                device_id: _,
+                ref event,
+                is_synthetic: _,
+            } => {
+                if let PhysicalKey::Code(code) = event.physical_key {
+                    let mut keyboard = self.world.resource_mut::<KeyboardInput>();
+                    match event.state {
+                        ElementState::Pressed => {
+                            keyboard.just_pressesd.insert(code);
+                            keyboard.pressed.insert(code);
+                        }
+                        ElementState::Released => {
+                            keyboard.just_released.insert(code);
+                            keyboard.pressed.remove(&code);
+                        }
+                    }
+                }
+            }
+            WindowEvent::MouseInput {
+                device_id: _,
+                state,
+                button,
+            } => {
+                let mut keyboard = self.world.resource_mut::<MouseInput>();
+                match state {
+                    ElementState::Pressed => {
+                        keyboard.just_pressesd.insert(button);
+                        keyboard.pressed.insert(button);
+                    }
+                    ElementState::Released => {
+                        keyboard.just_released.insert(button);
+                        keyboard.pressed.remove(&button);
+                    }
+                }
+            }
+            _ => {}
         }
         self.world.send_event(WindowEventECS(event));
     }
@@ -126,6 +206,7 @@ fn main() {
         startup_schedule: Schedule::new(Startup),
         update_schedule: Schedule::new(Update),
         fixed_update_schedule: Schedule::new(FixedUpdate),
+        post_update_schedule: Schedule::new(PostUpdate),
         render_schedule: Schedule::new(Render),
     };
 

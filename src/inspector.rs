@@ -9,7 +9,7 @@ pub fn handle_egui(
     mut camera: Single<(&mut Transform, &mut Camera3d)>,
     mut ui_query: Query<&mut UIRect>,
     debug_info: Option<Res<DebugInfo>>,
-    window: NonSend<Window>,
+    window: NonSend<NSWindow>,
 ) {
     for event in window_events.read() {
         let _ = egui.on_event(&window.winit_window, &event.0);

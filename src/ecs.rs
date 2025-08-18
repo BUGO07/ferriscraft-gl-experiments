@@ -1,15 +1,25 @@
+use std::{collections::HashSet, time::Duration};
+
 pub use bevy_ecs::{prelude::*, schedule::ScheduleLabel};
 pub use glam::*;
 
 use glium::{
-    Display, IndexBuffer, Program, Texture2d, VertexBuffer, glutin::surface::WindowSurface,
+    Display, IndexBuffer, Program, Texture2d, VertexBuffer,
+    glutin::surface::WindowSurface,
+    winit::{event::MouseButton, keyboard::KeyCode, window::CursorGrabMode},
 };
 
 use crate::mesher::VoxelVertex;
 
-pub struct Window {
+pub struct NSWindow {
     pub winit_window: glium::winit::window::Window,
     pub gl_context: Display<WindowSurface>,
+}
+
+#[derive(Resource)]
+pub struct Window {
+    pub cursor_grab: CursorGrabMode,
+    pub cursor_visible: bool,
 }
 
 #[derive(Resource, Debug, Default)]
@@ -17,6 +27,62 @@ pub struct DebugInfo {
     pub draw_calls: usize,
     pub vertices: usize,
     pub indices: usize,
+}
+
+#[derive(Resource, Debug, Default)]
+pub struct Time {
+    pub delta: Duration,
+}
+
+impl Time {
+    pub fn delta_secs(&self) -> f32 {
+        self.delta.as_secs_f32()
+    }
+}
+
+#[derive(Resource, Debug, Default)]
+pub struct MouseInput {
+    pub just_pressesd: HashSet<MouseButton>,
+    pub just_released: HashSet<MouseButton>,
+    pub pressed: HashSet<MouseButton>,
+    pub position: Vec2,
+    pub motion: Vec2,
+    pub scroll: Vec2,
+}
+
+impl MouseInput {
+    pub fn just_pressed(&self, key: MouseButton) -> bool {
+        self.just_pressesd.contains(&key)
+    }
+
+    pub fn just_released(&self, key: MouseButton) -> bool {
+        self.just_released.contains(&key)
+    }
+
+    pub fn pressed(&self, key: MouseButton) -> bool {
+        self.pressed.contains(&key)
+    }
+}
+
+#[derive(Resource, Debug, Default)]
+pub struct KeyboardInput {
+    pub just_pressesd: HashSet<KeyCode>,
+    pub just_released: HashSet<KeyCode>,
+    pub pressed: HashSet<KeyCode>,
+}
+
+impl KeyboardInput {
+    pub fn just_pressed(&self, key: KeyCode) -> bool {
+        self.just_pressesd.contains(&key)
+    }
+
+    pub fn just_released(&self, key: KeyCode) -> bool {
+        self.just_released.contains(&key)
+    }
+
+    pub fn pressed(&self, key: KeyCode) -> bool {
+        self.pressed.contains(&key)
+    }
 }
 
 #[derive(Debug, Default)]
@@ -239,3 +305,6 @@ pub struct Update;
 
 #[derive(ScheduleLabel, Hash, PartialEq, Eq, Debug, Clone)]
 pub struct FixedUpdate;
+
+#[derive(ScheduleLabel, Hash, PartialEq, Eq, Debug, Clone)]
+pub struct PostUpdate;

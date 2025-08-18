@@ -1,6 +1,6 @@
-#version 140
+#version 330 core
 
-in uint vertex_data;
+layout(location = 0) in uint vertex_data;
 
 out vec3 v_pos;
 out vec3 v_normal;
