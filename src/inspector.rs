@@ -7,6 +7,7 @@ pub fn handle_egui(
     mut window_events: EventReader<WindowEventECS>,
     // mut query: Query<(&mut Transform, Option<&Name>)>,
     mut camera: Single<(&mut Transform, &mut Camera3d)>,
+    mut ui_query: Query<&mut UIRect>,
     debug_info: Option<Res<DebugInfo>>,
     window: NonSend<Window>,
 ) {
@@ -24,9 +25,41 @@ pub fn handle_egui(
             // let mut iter = query.iter_mut();
             // let (mut transform, name) = iter.next().unwrap();
             egui_display_transform("camera", ui, &mut camera.0);
-            // for (mut transform, name) in iter {
-            //     egui_display_transform(name.map_or("Entity", |x| x), ui, &mut transform);
-            // }
+            for mut ui_node in ui_query.iter_mut() {
+                ui.vertical_centered(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("ui node");
+                        ui.add(
+                            egui::DragValue::new(ui_node.x.as_f32())
+                                .speed(0.1)
+                                .range(f32::MIN..=f32::MAX)
+                                .min_decimals(2)
+                                .max_decimals(2),
+                        );
+                        ui.add(
+                            egui::DragValue::new(ui_node.y.as_f32())
+                                .speed(0.1)
+                                .range(f32::MIN..=f32::MAX)
+                                .min_decimals(2)
+                                .max_decimals(2),
+                        );
+                        ui.add(
+                            egui::DragValue::new(ui_node.width.as_f32())
+                                .speed(0.1)
+                                .range(f32::MIN..=f32::MAX)
+                                .min_decimals(2)
+                                .max_decimals(2),
+                        );
+                        ui.add(
+                            egui::DragValue::new(ui_node.height.as_f32())
+                                .speed(0.1)
+                                .range(f32::MIN..=f32::MAX)
+                                .min_decimals(2)
+                                .max_decimals(2),
+                        );
+                    });
+                });
+            }
         });
 
         if let Some(debug_info) = &debug_info {

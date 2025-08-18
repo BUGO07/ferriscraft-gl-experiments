@@ -17,8 +17,10 @@ use crate::{ecs::*, events::WindowEventECS};
 #[macro_use]
 extern crate glium;
 
-const VERTEX_SHADER: &str = include_str!("../assets/shaders/vertex.glsl");
-const FRAGMENT_SHADER: &str = include_str!("../assets/shaders/fragment.glsl");
+const VOXEL_VERTEX_SHADER: &str = include_str!("../assets/shaders/voxel.vert");
+const VOXEL_FRAGMENT_SHADER: &str = include_str!("../assets/shaders/voxel.frag");
+const UI_VERTEX_SHADER: &str = include_str!("../assets/shaders/ui.vert");
+const UI_FRAGMENT_SHADER: &str = include_str!("../assets/shaders/ui.frag");
 
 const CHUNK_SIZE: i32 = 16;
 const SEA_LEVEL: i32 = 32;
@@ -110,7 +112,6 @@ impl ApplicationHandler for Application {
             _ => (),
         }
         self.world.send_event(WindowEventECS(event));
-        // window.request_redraw();
     }
 }
 

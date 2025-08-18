@@ -5,7 +5,7 @@ use glium::{
     Display, IndexBuffer, Program, Texture2d, VertexBuffer, glutin::surface::WindowSurface,
 };
 
-use crate::mesher::Vertex;
+use crate::mesher::VoxelVertex;
 
 pub struct Window {
     pub winit_window: glium::winit::window::Window,
@@ -31,12 +31,12 @@ impl Meshes {
 
 #[derive(Debug)]
 pub struct Mesh {
-    pub vertex_buffer: VertexBuffer<Vertex>,
+    pub vertex_buffer: VertexBuffer<VoxelVertex>,
     pub index_buffer: IndexBuffer<u32>,
 }
 
 impl Mesh {
-    pub fn new(vertex_buffer: VertexBuffer<Vertex>, index_buffer: IndexBuffer<u32>) -> Self {
+    pub fn new(vertex_buffer: VertexBuffer<VoxelVertex>, index_buffer: IndexBuffer<u32>) -> Self {
         Self {
             vertex_buffer,
             index_buffer,
@@ -94,6 +94,47 @@ pub struct Camera3d {
 #[derive(Component)]
 pub struct DirectionalLight {
     pub illuminance: f32,
+}
+
+pub enum Val {
+    Percent(f32),
+    Px(f32),
+}
+
+impl Val {
+    pub fn as_f32(&mut self) -> &mut f32 {
+        match self {
+            Val::Percent(p) => p,
+            Val::Px(p) => p,
+        }
+    }
+    pub fn calculate(&self, size: f32) -> f32 {
+        match self {
+            Val::Percent(p) => p / 100.0 * 2.0,
+            Val::Px(p) => p / size * 2.0,
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct UIRect {
+    pub x: Val,
+    pub y: Val,
+    pub width: Val,
+    pub height: Val,
+    pub color: Vec4,
+}
+
+impl UIRect {
+    pub fn new(x: Val, y: Val, width: Val, height: Val, color: Vec4) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+            color,
+        }
+    }
 }
 
 #[derive(Component, Clone, Copy)]
