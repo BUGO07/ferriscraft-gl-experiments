@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    f32::consts::{FRAC_PI_4, FRAC_PI_6},
+};
 
 use egui_glium::EguiGlium;
 use glium::{
@@ -39,7 +42,8 @@ pub fn render_setup(
         DirectionalLight {
             illuminance: 1000.0,
         },
-        Transform::from_xyz(3.0, 5.0, 2.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::DEFAULT
+            .with_rotation(Quat::from_rotation_x(FRAC_PI_4) * Quat::from_rotation_y(-FRAC_PI_6)),
     ));
 
     // Shared material / texture
@@ -124,7 +128,7 @@ pub fn render_update(
     target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
 
     let (camera_transform, camera) = camera_query.into_inner();
-    let (light_transform, _light) = light_query.into_inner();
+    let (light_transform, light) = light_query.into_inner();
 
     let (width, height) = target.get_dimensions();
     let perspective = Mat4::perspective_rh_gl(
@@ -162,7 +166,7 @@ pub fn render_update(
             view: view.to_cols_array_2d(),
             perspective: perspective.to_cols_array_2d(),
             tex: sampler,
-            u_light: (light_transform.rotation * Vec3::NEG_Z).normalize().to_array(),
+            u_light: (view * Mat4::from_quat(light_transform.rotation) * Vec4::NEG_Z).truncate().normalize().extend(light.illuminance).to_array(),
         };
 
         let params = DrawParameters {

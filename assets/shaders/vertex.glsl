@@ -6,6 +6,8 @@ out vec3 v_pos;
 out vec3 v_normal;
 out vec2 v_uv;
 
+flat out uint v_block;
+
 uniform mat4 perspective;
 uniform mat4 view;
 uniform mat4 model;
@@ -60,6 +62,8 @@ void main() {
     uint corner = (vertex_data >> 21) & 3u;
     uint block  = (vertex_data >> 23) & 63u;
 
+    v_block = block;
+
     vec3 pos = vec3(float(vertex_data & 63u), float((vertex_data >> 6)  & 63u), float((vertex_data >> 12) & 63u));
     vec3 n = normals[int(normal)];
 
@@ -67,7 +71,7 @@ void main() {
     v_uv = uvs[int(corner)];
 
     mat4 modelview = view * model;
-    v_normal = transpose(inverse(mat3(modelview))) * n;
+    v_normal = normalize(transpose(inverse(mat3(modelview))) * n);
 
     gl_Position = perspective * modelview * vec4(pos, 1.0);
     v_pos = gl_Position.xyz / gl_Position.w;
