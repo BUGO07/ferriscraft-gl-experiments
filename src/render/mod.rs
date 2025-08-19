@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use egui_glium::EguiGlium;
+use fastnoise_lite::FastNoiseLite;
 use glium::{
     BackfaceCullingMode, Depth, DepthTest, DrawParameters, IndexBuffer, Surface, VertexBuffer,
     index::PrimitiveType,
@@ -8,15 +9,15 @@ use glium::{
 };
 
 use crate::{
-    Application, CHUNK_SIZE, SEA_LEVEL,
+    App, CHUNK_SIZE,
     ecs::*,
     utils::{Quad, frustum_planes, generate_block_at, should_cull, vec3_to_index},
-    world::mesher::{Chunk, ChunkMesh, Direction, UIVertex},
+    world::mesher::{Chunk, ChunkMesh, UIVertex, VoxelVertex},
 };
 
 pub mod inspector;
 
-pub fn render_plugin(app: &mut Application) {
+pub fn render_plugin(app: &mut App) {
     app.add_systems(Startup, setup)
         .add_systems(EguiContextPass, inspector::handle_egui)
         .add_systems(RenderUpdate, render_update);
@@ -24,7 +25,8 @@ pub fn render_plugin(app: &mut Application) {
 
 pub fn setup(
     mut commands: Commands,
-    mut meshes: NonSendMut<Meshes>,
+    mut ui_meshes: NonSendMut<Meshes<UIVertex>>,
+    mut voxel_meshes: NonSendMut<Meshes<VoxelVertex>>,
     mut materials: NonSendMut<Materials>,
     window: NonSend<NSWindow>,
 ) {
@@ -66,11 +68,35 @@ pub fn setup(
         ui_material,
     ));
 
+    let verts = Quad::DEFAULT
+        .corners
+        .iter()
+        .enumerate()
+        .map(|c| UIVertex { corner: c.0 as u32 })
+        .collect::<Vec<_>>();
+
+    let inds = (0..verts.len())
+        .step_by(4)
+        .flat_map(|i| {
+            let idx = i as u32;
+            [idx, idx + 1, idx + 2, idx, idx + 2, idx + 3]
+        })
+        .collect::<Vec<_>>();
+
+    let vertex_buffer = VertexBuffer::new(&window.facade, &verts).unwrap();
+    let index_buffer =
+        IndexBuffer::new(&window.facade, PrimitiveType::TrianglesList, &inds).unwrap();
+    ui_meshes.add(Mesh::new(vertex_buffer, index_buffer));
+
     let voxel_material = materials.add(Material::new(&window.facade, "voxel", Some("atlas.png")));
 
     const CHUNK_SIZE_VEC: Vec3 = Vec3::splat(CHUNK_SIZE as f32);
 
     let mut chunks = HashMap::new();
+
+    let mut noise = FastNoiseLite::new();
+    noise.set_noise_type(Some(fastnoise_lite::NoiseType::Perlin));
+    noise.set_frequency(Some(0.01));
 
     for cy in 0..4 {
         for cz in -8..8 {
@@ -78,14 +104,22 @@ pub fn setup(
                 let chunk_pos = IVec3::new(cx, cy, cz);
                 let mut chunk = Chunk::new(chunk_pos);
 
-                for y in 0..CHUNK_SIZE {
-                    for z in 0..CHUNK_SIZE {
-                        for x in 0..CHUNK_SIZE {
+                for z in 0..CHUNK_SIZE {
+                    for x in 0..CHUNK_SIZE {
+                        let global_x = x + chunk_pos.x * CHUNK_SIZE;
+                        let global_z = z + chunk_pos.z * CHUNK_SIZE;
+
+                        let max_y = (noise.get_noise_2d(global_x as f32, global_z as f32) + 1.0)
+                            * 0.5
+                            * 64.0;
+                        let max_y = max_y as i32;
+
+                        for y in 0..CHUNK_SIZE {
+                            let global_y = y + chunk_pos.y * CHUNK_SIZE;
                             let block_pos = ivec3(x, y, z);
-                            chunk.blocks[vec3_to_index(block_pos)] = generate_block_at(
-                                block_pos + chunk_pos * CHUNK_SIZE,
-                                rand::random_range(SEA_LEVEL..(CHUNK_SIZE * 4 - 1)),
-                            );
+
+                            chunk.blocks[vec3_to_index(block_pos)] =
+                                generate_block_at(ivec3(global_x, global_y, global_z), max_y);
                         }
                     }
                 }
@@ -105,7 +139,7 @@ pub fn setup(
             )
             .unwrap();
 
-            let mesh_id = meshes.add(Mesh::new(vertex_buffer, index_buffer));
+            let mesh_id = voxel_meshes.add(Mesh::new(vertex_buffer, index_buffer));
 
             commands.spawn((
                 mesh_id,
@@ -120,7 +154,8 @@ pub fn setup(
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn render_update(
     window: NonSend<NSWindow>,
-    meshes: NonSend<Meshes>,
+    ui_meshes: NonSend<Meshes<UIVertex>>,
+    voxel_meshes: NonSend<Meshes<VoxelVertex>>,
     materials: NonSend<Materials>,
     mesh_entities: Query<
         (&Transform, &Mesh3d, &MeshMaterial, &Aabb),
@@ -163,7 +198,7 @@ pub fn render_update(
             let Mesh {
                 vertex_buffer,
                 index_buffer,
-            } = &meshes.0[mesh_id.0];
+            } = &voxel_meshes.0[mesh_id.0];
             let Material { program, texture } = &materials.0[material_id.0];
 
             let sampler = texture
@@ -207,41 +242,10 @@ pub fn render_update(
         let window_size = vec2(width as f32, height as f32);
 
         for ui_item in ui_query.iter() {
-            let quad = Quad::from_direction(
-                Direction::Front,
-                vec3(
-                    ui_item.x.calculate(window_size.x) - 1.0,
-                    1.0 - ui_item.y.calculate(window_size.y),
-                    0.0,
-                ),
-                vec3(
-                    ui_item.width.calculate(window_size.x),
-                    -ui_item.height.calculate(window_size.y),
-                    0.0,
-                ),
-            );
-            let verts = quad
-                .corners
-                .iter()
-                .map(|c| UIVertex { pos: [c[0], c[1]] })
-                .collect::<Vec<_>>();
-
-            let inds = (0..verts.len())
-                .step_by(4)
-                .flat_map(|i| {
-                    let idx = i as u32;
-                    [idx, idx + 1, idx + 2, idx, idx + 2, idx + 3]
-                })
-                .collect::<Vec<_>>();
-
-            let vertex_buffer = VertexBuffer::new(&window.facade, &verts).unwrap();
-            let index_buffer =
-                IndexBuffer::new(&window.facade, PrimitiveType::TrianglesList, &inds).unwrap();
-
-            vertices += vertex_buffer.len();
-            indices += index_buffer.len();
-            draw_calls += 1;
-
+            let Mesh {
+                vertex_buffer,
+                index_buffer,
+            } = &ui_meshes.0[0]; // 1x1 quad
             let Material { program, texture } = &materials.0[ui_item.material.0];
 
             let sampler = texture
@@ -249,14 +253,29 @@ pub fn render_update(
                 .magnify_filter(MagnifySamplerFilter::Nearest)
                 .minify_filter(MinifySamplerFilter::NearestMipmapNearest);
 
+            let pos = [
+                ui_item.x.calculate(window_size.x) - 1.0,
+                1.0 - ui_item.y.calculate(window_size.y),
+            ];
+            let size = [
+                ui_item.width.calculate(window_size.x),
+                -ui_item.height.calculate(window_size.y),
+            ];
+
             let uniforms = uniform! {
+                pos: pos,
+                size: size,
                 tex: sampler,
             };
 
+            vertices += vertex_buffer.len();
+            indices += index_buffer.len();
+            draw_calls += 1;
+
             target
                 .draw(
-                    &vertex_buffer,
-                    &index_buffer,
+                    vertex_buffer,
+                    index_buffer,
                     program,
                     &uniforms,
                     &DrawParameters::default(),

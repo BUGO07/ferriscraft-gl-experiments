@@ -4,12 +4,12 @@ use glium::winit::{
     window::CursorGrabMode,
 };
 
-use crate::{Application, ecs::*};
+use crate::{App, ecs::*};
 
 #[derive(Event)]
 pub struct WindowEventECS(pub WindowEvent);
 
-pub fn window_plugin(app: &mut Application) {
+pub fn window_plugin(app: &mut App) {
     app.world.init_resource::<Events<WindowEventECS>>();
     app.world.init_resource::<KeyboardInput>();
     app.world.init_resource::<MouseInput>();

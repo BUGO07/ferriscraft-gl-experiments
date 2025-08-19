@@ -4,14 +4,12 @@ pub use bevy_ecs::{prelude::*, schedule::ScheduleLabel};
 pub use glam::*;
 
 use glium::{
-    Display, IndexBuffer, Program, Texture2d, VertexBuffer,
+    Display, IndexBuffer, Program, Texture2d, Vertex, VertexBuffer,
     glutin::surface::WindowSurface,
     texture::RawImage2d,
     winit::{event::MouseButton, keyboard::KeyCode, window::CursorGrabMode},
 };
 use image::ImageFormat;
-
-use crate::world::mesher::VoxelVertex;
 
 pub struct NSWindow {
     pub winit: glium::winit::window::Window,
@@ -90,23 +88,23 @@ impl KeyboardInput {
 }
 
 #[derive(Debug, Default)]
-pub struct Meshes(pub Vec<Mesh>);
+pub struct Meshes<T: Vertex>(pub Vec<Mesh<T>>);
 
-impl Meshes {
-    pub fn add(&mut self, mesh: Mesh) -> Mesh3d {
+impl<T: Vertex> Meshes<T> {
+    pub fn add(&mut self, mesh: Mesh<T>) -> Mesh3d {
         self.0.push(mesh);
         Mesh3d(self.0.len() - 1)
     }
 }
 
 #[derive(Debug)]
-pub struct Mesh {
-    pub vertex_buffer: VertexBuffer<VoxelVertex>,
+pub struct Mesh<T: Vertex> {
+    pub vertex_buffer: VertexBuffer<T>,
     pub index_buffer: IndexBuffer<u32>,
 }
 
-impl Mesh {
-    pub fn new(vertex_buffer: VertexBuffer<VoxelVertex>, index_buffer: IndexBuffer<u32>) -> Self {
+impl<T: Vertex> Mesh<T> {
+    pub fn new(vertex_buffer: VertexBuffer<T>, index_buffer: IndexBuffer<u32>) -> Self {
         Self {
             vertex_buffer,
             index_buffer,

@@ -73,8 +73,10 @@ pub struct Quad {
 }
 
 impl Quad {
+    pub const DEFAULT: Self = Self::from_direction(Direction::Front, Vec3::ZERO, Vec3::ONE);
+
     #[inline]
-    pub fn from_direction(direction: Direction, pos: Vec3, size: Vec3) -> Self {
+    pub const fn from_direction(direction: Direction, pos: Vec3, size: Vec3) -> Self {
         let corners = match direction {
             Direction::Left => [
                 [pos.x, pos.y, pos.z],
