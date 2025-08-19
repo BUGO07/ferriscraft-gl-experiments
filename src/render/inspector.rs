@@ -1,6 +1,6 @@
 use egui_glium::{EguiGlium, egui_winit::egui};
 
-use crate::{ecs::*, events::WindowEventECS};
+use crate::{ecs::*, window::WindowEventECS};
 
 pub fn handle_egui(
     mut egui: NonSendMut<EguiGlium>,

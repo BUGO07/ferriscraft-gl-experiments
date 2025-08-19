@@ -1,19 +1,19 @@
 use std::time::{Duration, Instant};
 
+use bevy_ecs::system::ScheduleSystem;
 use egui_glium::{EguiGlium, egui_winit::egui};
 use glam::*;
 use glium::{
     backend::glutin::SimpleWindowBuilder,
     winit::{
         application::ApplicationHandler,
-        event::{DeviceEvent, ElementState, MouseScrollDelta, WindowEvent},
+        event::{DeviceEvent, MouseScrollDelta, WindowEvent},
         event_loop::{ActiveEventLoop, EventLoop},
-        keyboard::PhysicalKey,
         window::{CursorGrabMode, WindowId},
     },
 };
 
-use crate::{ecs::*, events::WindowEventECS};
+use crate::{ecs::*, window::WindowEventECS};
 
 #[macro_use]
 extern crate glium;
@@ -22,73 +22,64 @@ const CHUNK_SIZE: i32 = 16;
 const SEA_LEVEL: i32 = 32;
 
 pub mod ecs;
-pub mod mesher;
+pub mod world;
 
-mod events;
-mod inspector;
-mod movement;
+mod player;
 mod render;
 mod utils;
+mod window;
 
 pub struct Application {
     world: World,
     last_update: Instant,
     fu_accumulator: Duration,
     fixed_dt: Duration,
-    startup_schedule: Schedule,
-    update_schedule: Schedule,
-    fixed_update_schedule: Schedule,
-    post_update_schedule: Schedule,
-    render_schedule: Schedule,
 }
 
 impl ApplicationHandler for Application {
-    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
-        self.world.clear_all();
-    }
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let (window, display) = SimpleWindowBuilder::new()
+        let (winit, facade) = SimpleWindowBuilder::new()
             .with_title("FerrisCraft GL")
             .with_inner_size(1280, 720)
             .build(event_loop);
 
-        assert!(display.is_glsl_version_supported(&glium::Version(glium::Api::Gl, 3, 3)));
+        assert!(facade.is_glsl_version_supported(&glium::Version(glium::Api::Gl, 3, 3)));
 
-        self.world.init_resource::<Events<WindowEventECS>>();
-        self.world.init_resource::<KeyboardInput>();
-        self.world.init_resource::<MouseInput>();
-        self.world.init_resource::<Time>();
         self.world.insert_resource(Window {
             cursor_grab: CursorGrabMode::None,
             cursor_visible: true,
-            width: window.inner_size().width,
-            height: window.inner_size().height,
+            width: winit.inner_size().width,
+            height: winit.inner_size().height,
         });
         self.world.insert_non_send_resource(EguiGlium::new(
             egui::ViewportId::ROOT,
-            &display,
-            &window,
+            &facade,
+            &winit,
             &event_loop,
         ));
-        self.world.insert_non_send_resource(NSWindow {
-            winit: window,
-            facade: display,
-        });
+        self.world
+            .insert_non_send_resource(NSWindow { winit, facade });
         self.world.init_non_send_resource::<Meshes>();
         self.world.init_non_send_resource::<Materials>();
 
         #[cfg(debug_assertions)]
         self.world.init_resource::<DebugInfo>();
 
-        self.startup_schedule
-            .add_systems((render::setup, movement::setup));
-        self.startup_schedule.run(&mut self.world);
+        // in this exact order
+        self.world.add_schedule(Schedule::new(Startup));
+        self.world.add_schedule(Schedule::new(PreUpdate));
+        self.world.add_schedule(Schedule::new(Update));
+        self.world.add_schedule(Schedule::new(FixedUpdate));
+        self.world.add_schedule(Schedule::new(EguiContextPass));
+        self.world.add_schedule(Schedule::new(RenderUpdate));
+        self.world.add_schedule(Schedule::new(PostUpdate));
 
-        self.update_schedule.add_systems(movement::handle_movement);
-        self.render_schedule
-            .add_systems((inspector::handle_egui, render::render_update).chain());
-        self.post_update_schedule
-            .add_systems((events::handle_input_cleanup, events::handle_window));
+        window::window_plugin(self);
+        player::player_plugin(self);
+        world::world_plugin(self);
+        render::render_plugin(self);
+
+        self.world.run_schedule(Startup);
     }
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         self.world
@@ -102,6 +93,7 @@ impl ApplicationHandler for Application {
         _device_id: glium::winit::event::DeviceId,
         event: glium::winit::event::DeviceEvent,
     ) {
+        // when the cursor is locked window events dont receive the mouse motion but device events do
         match event {
             DeviceEvent::MouseMotion { delta } => {
                 let window = self.world.resource::<Window>();
@@ -139,59 +131,35 @@ impl ApplicationHandler for Application {
                 self.last_update = now;
 
                 while self.fu_accumulator >= self.fixed_dt {
-                    self.fixed_update_schedule.run(&mut self.world);
+                    self.world.run_schedule(FixedUpdate);
                     self.fu_accumulator -= self.fixed_dt;
                 }
 
-                self.update_schedule.run(&mut self.world);
-                self.render_schedule.run(&mut self.world);
-                self.post_update_schedule.run(&mut self.world);
-            }
-            WindowEvent::Resized(window_size) => {
-                self.world
-                    .non_send_resource_mut::<NSWindow>()
-                    .facade
-                    .resize(window_size.into());
-            }
-            WindowEvent::KeyboardInput {
-                device_id: _,
-                ref event,
-                is_synthetic: _,
-            } => {
-                if let PhysicalKey::Code(code) = event.physical_key {
-                    let mut keyboard = self.world.resource_mut::<KeyboardInput>();
-                    match event.state {
-                        ElementState::Pressed => {
-                            keyboard.just_pressesd.insert(code);
-                            keyboard.pressed.insert(code);
-                        }
-                        ElementState::Released => {
-                            keyboard.just_released.insert(code);
-                            keyboard.pressed.remove(&code);
-                        }
-                    }
-                }
-            }
-            WindowEvent::MouseInput {
-                device_id: _,
-                state,
-                button,
-            } => {
-                let mut keyboard = self.world.resource_mut::<MouseInput>();
-                match state {
-                    ElementState::Pressed => {
-                        keyboard.just_pressesd.insert(button);
-                        keyboard.pressed.insert(button);
-                    }
-                    ElementState::Released => {
-                        keyboard.just_released.insert(button);
-                        keyboard.pressed.remove(&button);
-                    }
-                }
+                self.world.run_schedule(PreUpdate);
+                self.world.run_schedule(Update);
+                self.world.run_schedule(EguiContextPass);
+                self.world.run_schedule(RenderUpdate);
+                self.world.run_schedule(PostUpdate);
             }
             _ => {}
         }
         self.world.send_event(WindowEventECS(event));
+    }
+    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
+        self.world.clear_all();
+    }
+}
+
+impl Application {
+    fn add_systems<M>(
+        &mut self,
+        schedule: impl ScheduleLabel,
+        systems: impl IntoScheduleConfigs<ScheduleSystem, M>,
+    ) -> &mut Self {
+        self.world
+            .resource_mut::<Schedules>()
+            .add_systems(schedule, systems);
+        self
     }
 }
 
@@ -203,11 +171,6 @@ fn main() {
         last_update: Instant::now(),
         fu_accumulator: Duration::ZERO,
         fixed_dt: Duration::from_secs_f32(1.0 / 64.0),
-        startup_schedule: Schedule::new(Startup),
-        update_schedule: Schedule::new(Update),
-        fixed_update_schedule: Schedule::new(FixedUpdate),
-        post_update_schedule: Schedule::new(PostUpdate),
-        render_schedule: Schedule::new(Render),
     };
 
     event_loop.run_app(&mut app).ok();

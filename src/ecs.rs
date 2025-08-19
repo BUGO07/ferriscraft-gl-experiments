@@ -11,7 +11,7 @@ use glium::{
 };
 use image::ImageFormat;
 
-use crate::mesher::VoxelVertex;
+use crate::world::mesher::VoxelVertex;
 
 pub struct NSWindow {
     pub winit: glium::winit::window::Window,
@@ -319,13 +319,19 @@ impl Transform {
 pub struct Startup;
 
 #[derive(ScheduleLabel, Hash, PartialEq, Eq, Debug, Clone)]
-pub struct Render;
+pub struct PreUpdate;
 
 #[derive(ScheduleLabel, Hash, PartialEq, Eq, Debug, Clone)]
 pub struct Update;
 
 #[derive(ScheduleLabel, Hash, PartialEq, Eq, Debug, Clone)]
 pub struct FixedUpdate;
+
+#[derive(ScheduleLabel, Hash, PartialEq, Eq, Debug, Clone)]
+pub struct EguiContextPass;
+
+#[derive(ScheduleLabel, Hash, PartialEq, Eq, Debug, Clone)]
+pub struct RenderUpdate;
 
 #[derive(ScheduleLabel, Hash, PartialEq, Eq, Debug, Clone)]
 pub struct PostUpdate;

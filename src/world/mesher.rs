@@ -127,8 +127,8 @@ impl ChunkMesh {
         } else {
             self.vertices.shrink_to_fit();
             self.indices
-                .extend((0..self.vertices.len() / 4).flat_map(|i| {
-                    let idx = i as u32 * 4;
+                .extend((0..self.vertices.len()).step_by(4).flat_map(|i| {
+                    let idx = i as u32;
                     [idx, idx + 1, idx + 2, idx, idx + 2, idx + 3]
                 }));
 

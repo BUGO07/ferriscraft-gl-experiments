@@ -8,11 +8,19 @@ use glium::{
 };
 
 use crate::{
-    CHUNK_SIZE, SEA_LEVEL,
+    Application, CHUNK_SIZE, SEA_LEVEL,
     ecs::*,
-    mesher::{Chunk, ChunkMesh, Direction, UIVertex},
     utils::{Quad, frustum_planes, generate_block_at, should_cull, vec3_to_index},
+    world::mesher::{Chunk, ChunkMesh, Direction, UIVertex},
 };
+
+pub mod inspector;
+
+pub fn render_plugin(app: &mut Application) {
+    app.add_systems(Startup, setup)
+        .add_systems(EguiContextPass, inspector::handle_egui)
+        .add_systems(RenderUpdate, render_update);
+}
 
 pub fn setup(
     mut commands: Commands,
@@ -218,9 +226,10 @@ pub fn render_update(
                 .map(|c| UIVertex { pos: [c[0], c[1]] })
                 .collect::<Vec<_>>();
 
-            let inds = (0..verts.len() / 4)
+            let inds = (0..verts.len())
+                .step_by(4)
                 .flat_map(|i| {
-                    let idx = i as u32 * 4;
+                    let idx = i as u32;
                     [idx, idx + 1, idx + 2, idx, idx + 2, idx + 3]
                 })
                 .collect::<Vec<_>>();
