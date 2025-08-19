@@ -6,20 +6,24 @@ pub use glam::*;
 use glium::{
     Display, IndexBuffer, Program, Texture2d, VertexBuffer,
     glutin::surface::WindowSurface,
+    texture::RawImage2d,
     winit::{event::MouseButton, keyboard::KeyCode, window::CursorGrabMode},
 };
+use image::ImageFormat;
 
 use crate::mesher::VoxelVertex;
 
 pub struct NSWindow {
-    pub winit_window: glium::winit::window::Window,
-    pub gl_context: Display<WindowSurface>,
+    pub winit: glium::winit::window::Window,
+    pub facade: Display<WindowSurface>,
 }
 
 #[derive(Resource)]
 pub struct Window {
     pub cursor_grab: CursorGrabMode,
     pub cursor_visible: bool,
+    pub width: u32,
+    pub height: u32,
 }
 
 #[derive(Resource, Debug, Default)]
@@ -127,15 +131,45 @@ pub struct Material {
 }
 
 impl Material {
-    pub fn new(program: Program, texture: Texture2d) -> Self {
-        Self { program, texture }
+    pub fn new(facade: &Display<WindowSurface>, shader: &str, texture_name: Option<&str>) -> Self {
+        let vertex_source = std::fs::read(format!("assets/shaders/{}.vert", shader))
+            .expect("couldn't find vertex shader");
+        let fragment_source = std::fs::read(format!("assets/shaders/{}.frag", shader))
+            .expect("couldn't find fragment shader");
+
+        // lmao
+        let texture = texture_name.map_or(
+            Texture2d::empty(facade, 64, 64).unwrap(), // idk
+            |name| {
+                let image = image::load(
+                    std::io::Cursor::new(std::fs::read(format!("assets/{}", name)).unwrap()),
+                    ImageFormat::Png, // probably not gonna change this
+                )
+                .unwrap()
+                .to_rgba8();
+                let image_dimensions = image.dimensions();
+                let image = RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
+                Texture2d::new(facade, image).unwrap()
+            },
+        );
+
+        Self {
+            program: Program::from_source(
+                facade,
+                str::from_utf8(&vertex_source).expect("couldn't read vertex shader"),
+                str::from_utf8(&fragment_source).expect("couldn't read fragment shader"),
+                None,
+            )
+            .unwrap(),
+            texture,
+        }
     }
 }
 
-#[derive(Component, Clone, Copy)]
+#[derive(Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Mesh3d(pub usize);
 
-#[derive(Component, Clone, Copy)]
+#[derive(Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MeshMaterial(pub usize);
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -188,17 +222,17 @@ pub struct UIRect {
     pub y: Val,
     pub width: Val,
     pub height: Val,
-    pub color: Vec4,
+    pub material: MeshMaterial,
 }
 
 impl UIRect {
-    pub fn new(x: Val, y: Val, width: Val, height: Val, color: Vec4) -> Self {
+    pub fn new(x: Val, y: Val, width: Val, height: Val, material: MeshMaterial) -> Self {
         Self {
             x,
             y,
             width,
             height,
-            color,
+            material,
         }
     }
 }
@@ -278,19 +312,6 @@ impl Transform {
         let up = dir.cross(right);
 
         self.rotation = Quat::from_mat3(&Mat3::from_cols(right, up, dir));
-    }
-
-    #[inline]
-    pub fn forward(&self) -> Vec3 {
-        self.rotation * Vec3::NEG_Z
-    }
-    #[inline]
-    pub fn right(&self) -> Vec3 {
-        self.rotation * Vec3::X
-    }
-    #[inline]
-    pub fn up(&self) -> Vec3 {
-        self.rotation * Vec3::Y
     }
 }
 

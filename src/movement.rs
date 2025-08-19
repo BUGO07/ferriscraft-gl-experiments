@@ -11,7 +11,13 @@ pub fn handle_movement(
     keyboard: Res<KeyboardInput>,
     mouse: Res<MouseInput>,
     time: Res<Time>,
+    mut window: ResMut<Window>,
 ) {
+    if keyboard.just_pressed(KeyCode::Escape) {
+        let grab = window.cursor_visible;
+        set_cursor_grab(&mut window, grab);
+    }
+
     let mut move_dir = Vec3::ZERO;
 
     let local_z = camera.rotation * Vec3::Z;
@@ -38,8 +44,10 @@ pub fn handle_movement(
     }
 
     let (mut yaw, mut pitch, _) = camera.rotation.to_euler(EulerRot::YXZ);
-    pitch -= mouse.motion.y * 0.01;
-    yaw -= mouse.motion.x * 0.01;
+    let window_scale = window.height.max(window.width) as f32;
+    // idk
+    pitch -= (1.2 * mouse.motion.y * window_scale / 10_000.0).to_radians();
+    yaw -= (1.2 * mouse.motion.x * window_scale / 10_000.0).to_radians();
 
     pitch = pitch.clamp(-1.54, 1.54);
 

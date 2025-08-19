@@ -119,12 +119,7 @@ impl ChunkMesh {
             .collect();
 
         for part in mesh_parts {
-            for v in part.vertices {
-                self.vertices.push(v);
-            }
-            for i in part.indices {
-                self.indices.push(i + self.vertices.len() as u32);
-            }
+            self.vertices.extend(part.vertices);
         }
 
         if self.vertices.is_empty() {
@@ -136,6 +131,7 @@ impl ChunkMesh {
                     let idx = i as u32 * 4;
                     [idx, idx + 1, idx + 2, idx, idx + 2, idx + 3]
                 }));
+
             Some(self)
         }
     }

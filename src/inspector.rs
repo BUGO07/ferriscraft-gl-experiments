@@ -12,10 +12,10 @@ pub fn handle_egui(
     window: NonSend<NSWindow>,
 ) {
     for event in window_events.read() {
-        let _ = egui.on_event(&window.winit_window, &event.0);
+        let _ = egui.on_event(&window.winit, &event.0);
     }
 
-    egui.run(&window.winit_window, |ctx| {
+    egui.run(&window.winit, |ctx| {
         egui::Window::new("change transforms").show(ctx, |ui| {
             ui.add(
                 egui::DragValue::new(&mut camera.1.fov)
