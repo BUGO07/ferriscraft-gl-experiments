@@ -18,18 +18,14 @@ use crate::{ecs::*, events::WindowEventECS};
 #[macro_use]
 extern crate glium;
 
-const VOXEL_VERTEX_SHADER: &str = include_str!("../assets/shaders/voxel.vert");
-const VOXEL_FRAGMENT_SHADER: &str = include_str!("../assets/shaders/voxel.frag");
-const UI_VERTEX_SHADER: &str = include_str!("../assets/shaders/ui.vert");
-const UI_FRAGMENT_SHADER: &str = include_str!("../assets/shaders/ui.frag");
-
 const CHUNK_SIZE: i32 = 16;
 const SEA_LEVEL: i32 = 32;
 
-mod ecs;
+pub mod ecs;
+pub mod mesher;
+
 mod events;
 mod inspector;
-mod mesher;
 mod movement;
 mod render;
 mod utils;
@@ -56,6 +52,8 @@ impl ApplicationHandler for Application {
             .with_inner_size(1280, 720)
             .build(event_loop);
 
+        assert!(display.is_glsl_version_supported(&glium::Version(glium::Api::Gl, 3, 3)));
+
         self.world.init_resource::<Events<WindowEventECS>>();
         self.world.init_resource::<KeyboardInput>();
         self.world.init_resource::<MouseInput>();
@@ -63,6 +61,8 @@ impl ApplicationHandler for Application {
         self.world.insert_resource(Window {
             cursor_grab: CursorGrabMode::None,
             cursor_visible: true,
+            width: window.inner_size().width,
+            height: window.inner_size().height,
         });
         self.world.insert_non_send_resource(EguiGlium::new(
             egui::ViewportId::ROOT,
@@ -71,8 +71,8 @@ impl ApplicationHandler for Application {
             &event_loop,
         ));
         self.world.insert_non_send_resource(NSWindow {
-            winit_window: window,
-            gl_context: display,
+            winit: window,
+            facade: display,
         });
         self.world.init_non_send_resource::<Meshes>();
         self.world.init_non_send_resource::<Materials>();
@@ -81,25 +81,25 @@ impl ApplicationHandler for Application {
         self.world.init_resource::<DebugInfo>();
 
         self.startup_schedule
-            .add_systems((render::render_setup, movement::setup));
+            .add_systems((render::setup, movement::setup));
         self.startup_schedule.run(&mut self.world);
 
         self.update_schedule.add_systems(movement::handle_movement);
         self.render_schedule
             .add_systems((inspector::handle_egui, render::render_update).chain());
         self.post_update_schedule
-            .add_systems((events::handle_input, events::handle_window));
+            .add_systems((events::handle_input_cleanup, events::handle_window));
     }
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         self.world
             .non_send_resource_mut::<NSWindow>()
-            .winit_window
+            .winit
             .request_redraw()
     }
     fn device_event(
         &mut self,
-        event_loop: &ActiveEventLoop,
-        device_id: glium::winit::event::DeviceId,
+        _event_loop: &ActiveEventLoop,
+        _device_id: glium::winit::event::DeviceId,
         event: glium::winit::event::DeviceEvent,
     ) {
         match event {
@@ -107,8 +107,8 @@ impl ApplicationHandler for Application {
                 let window = self.world.resource::<Window>();
                 if !matches!(window.cursor_grab, CursorGrabMode::None) {
                     let mut mouse = self.world.resource_mut::<MouseInput>();
-                    mouse.motion.x = delta.0 as f32;
-                    mouse.motion.y = delta.1 as f32;
+                    mouse.motion.x += delta.0 as f32;
+                    mouse.motion.y += delta.1 as f32;
                 }
             }
             DeviceEvent::MouseWheel { delta } => {
@@ -150,7 +150,7 @@ impl ApplicationHandler for Application {
             WindowEvent::Resized(window_size) => {
                 self.world
                     .non_send_resource_mut::<NSWindow>()
-                    .gl_context
+                    .facade
                     .resize(window_size.into());
             }
             WindowEvent::KeyboardInput {

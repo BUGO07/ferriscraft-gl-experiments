@@ -23,38 +23,26 @@ const vec3 normals[6] = vec3[6](
     vec3(0, 0,-1), 
     vec3(0, 0, 1));
 
-vec2[4] get_uvs(int normal, int block) {
-    float face_idx = 1.0; 
-    if (normal == 3) {
-        face_idx = 0.0;
-    }
-    else if (normal == 2) {
-        face_idx = 2.0;
-    }
+vec2 get_uv(int corner, int normal, int block) {
+    float face_idx = 1.0;
+    if (normal == 3) face_idx = 0.0;
+    else if (normal == 2) face_idx = 2.0;
 
     vec2 pos = vec2(face_idx / ATLAS_SIZE_X, 1.0 - (float(block) / ATLAS_SIZE_Y));
 
-    vec2 base[4];
-    base[0] = vec2(pos.x, pos.y + 1.0 / ATLAS_SIZE_Y); 
-    base[1] = vec2(pos.x, pos.y);                      
-    base[2] = vec2(pos.x + 1.0 / ATLAS_SIZE_X, pos.y); 
-    base[3] = vec2(pos.x + 1.0 / ATLAS_SIZE_X, pos.y + 1.0 / ATLAS_SIZE_Y); 
+    vec2 base[4] = vec2[4](
+        vec2(pos.x, pos.y + 1.0 / ATLAS_SIZE_Y),
+        vec2(pos.x, pos.y),
+        vec2(pos.x + 1.0 / ATLAS_SIZE_X, pos.y),
+        vec2(pos.x + 1.0 / ATLAS_SIZE_X, pos.y + 1.0 / ATLAS_SIZE_Y)
+    );
 
-    vec2 rotate_90[4]  = vec2[4](base[3], base[0], base[1], base[2]);
-    vec2 rotate_180[4] = vec2[4](base[2], base[3], base[0], base[1]);
-    vec2 rotate_270[4] = vec2[4](base[1], base[2], base[3], base[0]);
+    int rotated_corner = corner;
+    if (normal == 5 || normal == 4) rotated_corner = (corner + 2) % 4;
+    else if (normal == 0) rotated_corner = (corner + 1) % 4;
+    else rotated_corner = (corner + 3) % 4;
 
-    if (normal == 5 || normal == 4) {
-        return rotate_180;
-    }
-
-    else if (normal == 0) {
-        return rotate_270;
-    }
-
-    else {
-        return rotate_90;
-    }
+    return base[rotated_corner];
 }
 
 void main() {
@@ -67,8 +55,7 @@ void main() {
     vec3 pos = vec3(float(vertex_data & 63u), float((vertex_data >> 6)  & 63u), float((vertex_data >> 12) & 63u));
     vec3 n = normals[int(normal)];
 
-    vec2 uvs[4] = get_uvs(int(normal), int(block));
-    v_uv = uvs[int(corner)];
+    v_uv = get_uv(int(corner), int(normal), int(block));
 
     mat4 modelview = view * model;
     v_normal = normalize(transpose(inverse(mat3(modelview))) * n);
