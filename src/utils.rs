@@ -4,7 +4,7 @@ use glium::winit::window::CursorGrabMode;
 use crate::{
     CHUNK_SIZE,
     ecs::{Aabb, Window},
-    mesher::{Block, Direction},
+    world::mesher::{Block, Direction},
 };
 
 pub fn set_cursor_grab(window: &mut Window, val: bool) {
@@ -54,6 +54,20 @@ pub fn generate_block_at(pos: IVec3, max_y: i32) -> Block {
 
     // terrain_block
 }
+
+#[inline]
+pub fn vec3_to_index(pos: IVec3) -> usize {
+    (pos.x + pos.y * CHUNK_SIZE + pos.z * CHUNK_SIZE * CHUNK_SIZE) as usize
+}
+
+#[inline]
+pub fn index_to_vec3(index: usize) -> IVec3 {
+    ivec3(
+        index as i32 % CHUNK_SIZE,
+        (index as i32 / CHUNK_SIZE) % CHUNK_SIZE,
+        index as i32 / (CHUNK_SIZE * CHUNK_SIZE),
+    )
+}
 pub struct Quad {
     pub corners: [[f32; 3]; 4],
 }
@@ -102,20 +116,6 @@ impl Quad {
 
         Self { corners }
     }
-}
-
-#[inline]
-pub fn vec3_to_index(pos: IVec3) -> usize {
-    (pos.x + pos.y * CHUNK_SIZE + pos.z * CHUNK_SIZE * CHUNK_SIZE) as usize
-}
-
-#[inline]
-pub fn index_to_vec3(index: usize) -> IVec3 {
-    ivec3(
-        index as i32 % CHUNK_SIZE,
-        (index as i32 / CHUNK_SIZE) % CHUNK_SIZE,
-        index as i32 / (CHUNK_SIZE * CHUNK_SIZE),
-    )
 }
 
 pub fn should_cull(frustum: &[Vec4; 6], pos: Vec3, aabb: &Aabb) -> bool {
