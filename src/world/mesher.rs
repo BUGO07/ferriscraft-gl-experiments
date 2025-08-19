@@ -53,19 +53,19 @@ pub struct ChunkMesh {
     pub indices: Vec<u32>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct VoxelVertex {
     pub vertex_data: u32,
 }
 
 implement_vertex!(VoxelVertex, vertex_data);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct UIVertex {
-    pub pos: [f32; 2],
+    pub corner: u32,
 }
 
-implement_vertex!(UIVertex, pos);
+implement_vertex!(UIVertex, corner);
 
 impl ChunkMesh {
     pub fn build(mut self, chunk: &Chunk, chunks: &HashMap<IVec3, Chunk>) -> Option<Self> {
