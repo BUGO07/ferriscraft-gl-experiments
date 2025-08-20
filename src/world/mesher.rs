@@ -88,6 +88,7 @@ impl ChunkMesh {
                 let (back, left, down) =
                     chunk.get_adjacent_blocks(pos, left_chunk, back_chunk, down_chunk);
 
+                // TODO fix this so water works properly
                 if !current.is_air() {
                     if left.is_air() {
                         local_mesh.push_face(Direction::Left, pos, current);
