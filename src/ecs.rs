@@ -88,27 +88,31 @@ impl KeyboardInput {
 }
 
 #[derive(Debug, Default)]
-pub struct Meshes<T: Vertex>(pub Vec<Mesh<T>>);
+pub struct Meshes<T: Vertex>(pub Vec<(VertexBuffer<T>, IndexBuffer<u32>)>);
 
 impl<T: Vertex> Meshes<T> {
-    pub fn add(&mut self, mesh: Mesh<T>) -> Mesh3d {
-        self.0.push(mesh);
+    pub fn add(&mut self, mesh: Mesh<T>, facade: &Display<WindowSurface>) -> Mesh3d {
+        let vertex_buffer = VertexBuffer::new(facade, &mesh.vertices).unwrap();
+        let index_buffer = IndexBuffer::new(
+            facade,
+            glium::index::PrimitiveType::TrianglesList,
+            &mesh.indices,
+        )
+        .unwrap();
+        self.0.push((vertex_buffer, index_buffer));
         Mesh3d(self.0.len() - 1)
     }
 }
 
 #[derive(Debug)]
 pub struct Mesh<T: Vertex> {
-    pub vertex_buffer: VertexBuffer<T>,
-    pub index_buffer: IndexBuffer<u32>,
+    pub vertices: Vec<T>,
+    pub indices: Vec<u32>,
 }
 
 impl<T: Vertex> Mesh<T> {
-    pub fn new(vertex_buffer: VertexBuffer<T>, index_buffer: IndexBuffer<u32>) -> Self {
-        Self {
-            vertex_buffer,
-            index_buffer,
-        }
+    pub fn new(vertices: Vec<T>, indices: Vec<u32>) -> Self {
+        Self { vertices, indices }
     }
 }
 

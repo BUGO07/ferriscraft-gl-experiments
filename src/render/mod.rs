@@ -1,22 +1,17 @@
-use std::collections::HashMap;
-
 use egui_glium::EguiGlium;
-use fastnoise2::generator::{Generator, GeneratorWrapper, perlin::Perlin};
 use glium::{
-    BackfaceCullingMode, Blend, Depth, DepthTest, DrawParameters, IndexBuffer, Surface,
-    VertexBuffer,
-    index::PrimitiveType,
+    BackfaceCullingMode, Blend, Depth, DepthTest, DrawParameters, Surface,
     uniforms::{MagnifySamplerFilter, MinifySamplerFilter},
 };
 
 use crate::{
     App, CHUNK_SIZE,
     ecs::*,
-    utils::{Quad, frustum_planes, generate_block_at, should_cull, vec3_to_index},
-    world::mesher::{Chunk, ChunkMesh, UIVertex, VoxelVertex},
+    utils::{Quad, frustum_planes, should_cull},
+    world::mesher::{UIVertex, VoxelVertex},
 };
 
-pub mod inspector;
+mod inspector;
 
 pub fn render_plugin(app: &mut App) {
     app.add_systems(Startup, setup)
@@ -24,10 +19,9 @@ pub fn render_plugin(app: &mut App) {
         .add_systems(RenderUpdate, render_update);
 }
 
-pub fn setup(
+fn setup(
     mut commands: Commands,
     mut ui_meshes: NonSendMut<Meshes<UIVertex>>,
-    mut voxel_meshes: NonSendMut<Meshes<VoxelVertex>>,
     mut materials: NonSendMut<Materials>,
     window: NonSend<NSWindow>,
 ) {
@@ -84,75 +78,14 @@ pub fn setup(
         })
         .collect::<Vec<_>>();
 
-    let vertex_buffer = VertexBuffer::new(&window.facade, &verts).unwrap();
-    let index_buffer =
-        IndexBuffer::new(&window.facade, PrimitiveType::TrianglesList, &inds).unwrap();
-    ui_meshes.add(Mesh::new(vertex_buffer, index_buffer));
+    ui_meshes.add(Mesh::new(verts, inds), &window.facade);
 
-    let voxel_material = materials.add(Material::new(&window.facade, "voxel", Some("atlas.png")));
-
-    const CHUNK_SIZE_VEC: Vec3 = Vec3::splat(CHUNK_SIZE as f32);
-
-    let mut chunks = HashMap::new();
-
-    let noise = GeneratorWrapper(Perlin).domain_scale(0.01).build();
-
-    for cy in 0..4 {
-        for cz in -8..8 {
-            for cx in -8..8 {
-                let chunk_pos = IVec3::new(cx, cy, cz);
-                let mut chunk = Chunk::new(chunk_pos);
-
-                for z in 0..CHUNK_SIZE {
-                    for x in 0..CHUNK_SIZE {
-                        let global_x = x + chunk_pos.x * CHUNK_SIZE;
-                        let global_z = z + chunk_pos.z * CHUNK_SIZE;
-
-                        let max_y = (noise.gen_single_2d(global_x as f32, global_z as f32, 0)
-                            + 1.0)
-                            * 0.5
-                            * 64.0;
-                        let max_y = max_y as i32;
-
-                        for y in 0..CHUNK_SIZE {
-                            let global_y = y + chunk_pos.y * CHUNK_SIZE;
-                            let block_pos = ivec3(x, y, z);
-
-                            chunk.blocks[vec3_to_index(block_pos)] =
-                                generate_block_at(ivec3(global_x, global_y, global_z), max_y);
-                        }
-                    }
-                }
-
-                chunks.insert(chunk_pos, chunk);
-            }
-        }
-    }
-
-    for (chunk_pos, chunk) in &chunks {
-        if let Some(mesh_data) = ChunkMesh::default().build(chunk, &chunks) {
-            let vertex_buffer = VertexBuffer::new(&window.facade, &mesh_data.vertices).unwrap();
-            let index_buffer = IndexBuffer::new(
-                &window.facade,
-                PrimitiveType::TrianglesList,
-                &mesh_data.indices,
-            )
-            .unwrap();
-
-            let mesh_id = voxel_meshes.add(Mesh::new(vertex_buffer, index_buffer));
-
-            commands.spawn((
-                mesh_id,
-                voxel_material,
-                Transform::from_translation((chunk_pos * CHUNK_SIZE).as_vec3()),
-                Aabb::new(Vec3::ZERO, CHUNK_SIZE_VEC),
-            ));
-        }
-    }
+    // materials[1]
+    materials.add(Material::new(&window.facade, "voxel", Some("atlas.png")));
 }
 
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
-pub fn render_update(
+fn render_update(
     window: NonSend<NSWindow>,
     ui_meshes: NonSend<Meshes<UIVertex>>,
     voxel_meshes: NonSend<Meshes<VoxelVertex>>,
@@ -188,17 +121,14 @@ pub fn render_update(
         );
 
         let view = camera_transform.as_mat4().inverse();
-        let vp: Mat4 = perspective * view;
+        let vp = perspective * view;
         let frustum = frustum_planes(&vp);
 
         for (chunk_transform, mesh_id, material_id, aabb) in mesh_entities.iter() {
             if should_cull(&frustum, chunk_transform.translation, aabb) {
                 continue;
             }
-            let Mesh {
-                vertex_buffer,
-                index_buffer,
-            } = &voxel_meshes.0[mesh_id.0];
+            let (vertex_buffer, index_buffer) = &voxel_meshes.0[mesh_id.0];
             let Material { program, texture } = &materials.0[material_id.0];
 
             let sampler = texture
@@ -243,10 +173,7 @@ pub fn render_update(
         let window_size = vec2(width as f32, height as f32);
 
         for ui_item in ui_query.iter() {
-            let Mesh {
-                vertex_buffer,
-                index_buffer,
-            } = &ui_meshes.0[0]; // 1x1 quad
+            let (vertex_buffer, index_buffer) = &ui_meshes.0[0]; // 1x1 quad
             let Material { program, texture } = &materials.0[ui_item.material.0];
 
             let sampler = texture

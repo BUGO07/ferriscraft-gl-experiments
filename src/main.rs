@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use bevy_ecs::system::ScheduleSystem;
+use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use egui_glium::{EguiGlium, egui_winit::egui};
 use glam::*;
 use glium::{
@@ -33,6 +34,7 @@ use crate::{
 extern crate glium;
 
 const CHUNK_SIZE: i32 = 32;
+const SEA_LEVEL: i32 = 64;
 
 pub mod ecs;
 pub mod world;
@@ -95,6 +97,8 @@ impl ApplicationHandler for App {
         player::player_plugin(self);
         world::world_plugin(self);
         render::render_plugin(self);
+
+        AsyncComputeTaskPool::get_or_init(TaskPool::new);
 
         self.world.run_schedule(Startup);
     }
@@ -162,12 +166,18 @@ impl ApplicationHandler for App {
         }
         self.world.send_event(WindowEventECS(event));
     }
-    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
-        self.world.clear_all();
-    }
 }
 
 impl App {
+    fn init_resource<R: Resource + Default>(&mut self) -> &mut Self {
+        self.world.init_resource::<R>();
+        self
+    }
+    #[allow(dead_code)]
+    fn insert_resource<R: Resource>(&mut self, resource: R) -> &mut Self {
+        self.world.insert_resource(resource);
+        self
+    }
     fn add_systems<M>(
         &mut self,
         schedule: impl ScheduleLabel,

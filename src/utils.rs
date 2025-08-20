@@ -141,30 +141,18 @@ pub fn should_cull(frustum: &[Vec4; 6], pos: Vec3, aabb: &Aabb) -> bool {
 }
 
 pub fn frustum_planes(view_proj_matrix: &Mat4) -> [Vec4; 6] {
-    let mut planes: [Vec4; 6] = [Vec4::ZERO; 6];
-
     let row1 = view_proj_matrix.row(0);
     let row2 = view_proj_matrix.row(1);
     let row3 = view_proj_matrix.row(2);
     let row4 = view_proj_matrix.row(3);
 
-    let left = row4 + row1;
-    planes[0] = left;
-
-    let right = row4 - row1;
-    planes[1] = right;
-
-    let bottom = row4 + row2;
-    planes[2] = bottom;
-
-    let top = row4 - row2;
-    planes[3] = top;
-
-    let near = row4 + row3;
-    planes[4] = near;
-
-    let far = row4 - row3;
-    planes[5] = far;
-
-    planes
+    // left right bottom top near far
+    [
+        row4 + row1,
+        row4 - row1,
+        row4 + row2,
+        row4 - row2,
+        row4 + row3,
+        row4 - row3,
+    ]
 }
