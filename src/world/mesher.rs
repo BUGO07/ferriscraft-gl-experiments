@@ -68,7 +68,12 @@ pub struct UIVertex {
 implement_vertex!(UIVertex, corner);
 
 impl ChunkMesh {
-    pub fn build(mut self, chunk: &Chunk, chunks: &HashMap<IVec3, Chunk>) -> Option<Self> {
+    pub fn build(
+        mut self,
+        chunk: &Chunk,
+        chunks: &HashMap<IVec3, Chunk>,
+        // _noises: &NoiseFunctions,
+    ) -> Option<Self> {
         let chunk_pos = chunk.pos;
 
         let left_chunk = chunks.get(&(chunk_pos + IVec3::new(-1, 0, 0)));
@@ -139,17 +144,12 @@ impl ChunkMesh {
 
     #[inline(always)]
     pub fn push_face(&mut self, dir: Direction, pos: IVec3, block: Block) {
-        for (corner, pos) in Quad::from_direction(dir, pos.as_vec3(), Vec3::ONE)
-            .corners
-            .into_iter()
-            .enumerate()
-        {
+        for pos in Quad::from_direction(dir, pos.as_vec3(), Vec3::ONE).corners {
             let vertex_data = pos[0] as u32
                 | (pos[1] as u32) << 6
                 | (pos[2] as u32) << 12
                 | (dir as u32) << 18
-                | (corner as u32) << 21
-                | (block as u32) << 23;
+                | (block as u32) << 21;
 
             self.vertices.push(VoxelVertex { vertex_data });
         }

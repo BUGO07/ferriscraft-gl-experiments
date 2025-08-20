@@ -4,7 +4,7 @@ in vec3 v_pos;
 in vec3 v_normal;
 in vec2 v_uv;
 
-flat in uint v_block;
+flat in uint v_block_id;
 
 out vec4 color;
 
@@ -25,7 +25,7 @@ void main() {
     vec3 final_color = ambient_color + diffuse * diffuse_color * u_light.w / 800.0;
 
     // check if block is water or something and only then apply specular reflection;
-    if (v_block == 6u) {
+    if (v_block_id == 6u) {
         float specular = pow(max(dot(half_direction, normalize(v_normal)), 0.0), 16.0);
         final_color += specular * specular_color * u_light.w / 2500.0; // idk idc
 
