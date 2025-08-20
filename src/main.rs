@@ -32,7 +32,7 @@ use crate::{
 #[macro_use]
 extern crate glium;
 
-const CHUNK_SIZE: i32 = 16;
+const CHUNK_SIZE: i32 = 32;
 
 pub mod ecs;
 pub mod world;

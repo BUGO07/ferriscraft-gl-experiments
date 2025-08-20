@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
 use egui_glium::EguiGlium;
-use fastnoise_lite::FastNoiseLite;
+use fastnoise2::generator::{Generator, GeneratorWrapper, perlin::Perlin};
 use glium::{
-    BackfaceCullingMode, Depth, DepthTest, DrawParameters, IndexBuffer, Surface, VertexBuffer,
+    BackfaceCullingMode, Blend, Depth, DepthTest, DrawParameters, IndexBuffer, Surface,
+    VertexBuffer,
     index::PrimitiveType,
     uniforms::{MagnifySamplerFilter, MinifySamplerFilter},
 };
@@ -94,9 +95,7 @@ pub fn setup(
 
     let mut chunks = HashMap::new();
 
-    let mut noise = FastNoiseLite::new();
-    noise.set_noise_type(Some(fastnoise_lite::NoiseType::Perlin));
-    noise.set_frequency(Some(0.01));
+    let noise = GeneratorWrapper(Perlin).domain_scale(0.01).build();
 
     for cy in 0..4 {
         for cz in -8..8 {
@@ -109,7 +108,8 @@ pub fn setup(
                         let global_x = x + chunk_pos.x * CHUNK_SIZE;
                         let global_z = z + chunk_pos.z * CHUNK_SIZE;
 
-                        let max_y = (noise.get_noise_2d(global_x as f32, global_z as f32) + 1.0)
+                        let max_y = (noise.gen_single_2d(global_x as f32, global_z as f32, 0)
+                            + 1.0)
                             * 0.5
                             * 64.0;
                         let max_y = max_y as i32;
@@ -220,6 +220,7 @@ pub fn render_update(
                     write: true,
                     ..Default::default()
                 },
+                blend: Blend::alpha_blending(),
                 backface_culling: BackfaceCullingMode::CullClockwise,
                 ..Default::default()
             };
