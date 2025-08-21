@@ -104,7 +104,7 @@ impl<T: Vertex> Meshes<T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Mesh<T: Vertex> {
     pub vertices: Vec<T>,
     pub indices: Vec<u32>,
@@ -134,6 +134,7 @@ pub struct Material {
 
 impl Material {
     pub fn new(facade: &Display<WindowSurface>, shader: &str, texture_name: Option<&str>) -> Self {
+        println!("compiling {shader} shaders...");
         let vertex_source = std::fs::read(format!("assets/shaders/{}.vert", shader))
             .expect("couldn't find vertex shader");
         let fragment_source = std::fs::read(format!("assets/shaders/{}.frag", shader))
@@ -196,47 +197,6 @@ pub struct Camera3d {
 #[derive(Component)]
 pub struct DirectionalLight {
     pub illuminance: f32,
-}
-
-pub enum Val {
-    Percent(f32),
-    Px(f32),
-}
-
-impl Val {
-    pub fn as_f32(&mut self) -> &mut f32 {
-        match self {
-            Val::Percent(p) => p,
-            Val::Px(p) => p,
-        }
-    }
-    pub fn calculate(&self, size: f32) -> f32 {
-        match self {
-            Val::Percent(p) => p / 100.0 * 2.0,
-            Val::Px(p) => p / size * 2.0,
-        }
-    }
-}
-
-#[derive(Component)]
-pub struct UIRect {
-    pub x: Val,
-    pub y: Val,
-    pub width: Val,
-    pub height: Val,
-    pub material: MeshMaterial,
-}
-
-impl UIRect {
-    pub fn new(x: Val, y: Val, width: Val, height: Val, material: MeshMaterial) -> Self {
-        Self {
-            x,
-            y,
-            width,
-            height,
-            material,
-        }
-    }
 }
 
 #[derive(Component, Clone, Copy)]

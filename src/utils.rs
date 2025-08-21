@@ -2,7 +2,7 @@ use glam::*;
 use glium::winit::window::CursorGrabMode;
 
 use crate::{
-    CHUNK_SIZE,
+    CHUNK_SIZE, SEA_LEVEL,
     ecs::{Aabb, Window},
     world::mesher::{Block, Direction},
 };
@@ -29,6 +29,8 @@ pub fn generate_block_at(pos: IVec3, max_y: i32) -> Block {
             _ if y >= max_y - 4 => Block::Dirt,
             _ => Block::Stone,
         }
+    } else if y < SEA_LEVEL {
+        Block::Water
     } else {
         Block::Air
     }

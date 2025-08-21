@@ -2,10 +2,6 @@ use glium::winit::keyboard::KeyCode;
 
 use crate::{ecs::*, utils::set_cursor_grab};
 
-pub fn setup(mut window: ResMut<Window>) {
-    set_cursor_grab(&mut window, true);
-}
-
 pub fn handle_movement(
     mut camera: Single<&mut Transform, With<Camera3d>>,
     keyboard: Res<KeyboardInput>,

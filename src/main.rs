@@ -24,11 +24,7 @@ use glium::{
 };
 use glutin_winit::{DisplayBuilder, GlWindow};
 
-use crate::{
-    ecs::*,
-    window::WindowEventECS,
-    world::mesher::{UIVertex, VoxelVertex},
-};
+use crate::{ecs::*, ui::UIVertex, window::WindowEventECS, world::mesher::VoxelVertex};
 
 #[macro_use]
 extern crate glium;
@@ -41,6 +37,7 @@ pub mod world;
 
 mod player;
 mod render;
+mod ui;
 mod utils;
 mod window;
 
@@ -96,6 +93,7 @@ impl ApplicationHandler for App {
         window::window_plugin(self);
         player::player_plugin(self);
         world::world_plugin(self);
+        ui::ui_plugin(self);
         render::render_plugin(self);
 
         AsyncComputeTaskPool::get_or_init(TaskPool::new);
