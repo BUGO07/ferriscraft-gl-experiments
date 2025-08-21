@@ -2,6 +2,7 @@ use egui_glium::EguiGlium;
 use glium::{
     BackfaceCullingMode, Blend, Depth, DepthTest, DrawParameters, Surface,
     uniforms::{MagnifySamplerFilter, MinifySamplerFilter},
+    winit::keyboard::KeyCode,
 };
 
 use crate::{
@@ -33,7 +34,9 @@ fn render_update(
     light_query: Single<(&Transform, &DirectionalLight), (Without<Mesh3d>, Without<Camera3d>)>,
     ui_query: Query<&UIRect>,
     debug_info: Option<ResMut<DebugInfo>>,
+    keyboard: Res<KeyboardInput>,
     mut egui: NonSendMut<EguiGlium>,
+    mut apply_ao: Local<bool>,
 ) {
     let mut target = window.facade.draw();
     target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
@@ -42,6 +45,11 @@ fn render_update(
     let mut draw_calls = 0;
     let mut vertices = 0;
     let mut indices = 0;
+
+    // temporary
+    if keyboard.just_pressed(KeyCode::F1) {
+        *apply_ao = !*apply_ao;
+    }
 
     // chunks
     {
@@ -77,6 +85,7 @@ fn render_update(
                 perspective: perspective.to_cols_array_2d(),
                 tex: sampler,
                 u_light: (view * Mat4::from_quat(light_transform.rotation) * Vec4::NEG_Z).truncate().normalize().extend(light.illuminance).to_array(),
+                apply_ao: *apply_ao
             };
 
             let params = DrawParameters {

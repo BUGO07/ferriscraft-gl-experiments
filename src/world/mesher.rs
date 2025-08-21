@@ -63,7 +63,14 @@ pub trait ChunkMesh {
         noises: &NoiseFunctions,
     ) -> Option<Mesh<VoxelVertex>>;
 
-    fn push_face(&mut self, dir: Direction, pos: IVec3, block: Block);
+    fn push_face(
+        &mut self,
+        chunk: &Chunk,
+        dir: Direction,
+        pos: IVec3,
+        block: Block,
+        noises: &NoiseFunctions,
+    );
 }
 
 impl ChunkMesh for Mesh<VoxelVertex> {
@@ -94,23 +101,23 @@ impl ChunkMesh for Mesh<VoxelVertex> {
                 // TODO fix this so water works properly
                 if !current.is_air() {
                     if left.is_air() {
-                        local_mesh.push_face(Direction::Left, pos, current);
+                        local_mesh.push_face(chunk, Direction::Left, pos, current, noises);
                     }
                     if back.is_air() {
-                        local_mesh.push_face(Direction::Back, pos, current);
+                        local_mesh.push_face(chunk, Direction::Back, pos, current, noises);
                     }
                     if down.is_air() {
-                        local_mesh.push_face(Direction::Bottom, pos, current);
+                        local_mesh.push_face(chunk, Direction::Bottom, pos, current, noises);
                     }
                 } else {
                     if !left.is_air() {
-                        local_mesh.push_face(Direction::Right, pos, left);
+                        local_mesh.push_face(chunk, Direction::Right, pos, left, noises);
                     }
                     if !back.is_air() {
-                        local_mesh.push_face(Direction::Front, pos, back);
+                        local_mesh.push_face(chunk, Direction::Front, pos, back, noises);
                     }
                     if !down.is_air() {
-                        local_mesh.push_face(Direction::Top, pos, down);
+                        local_mesh.push_face(chunk, Direction::Top, pos, down, noises);
                     }
                 }
 
@@ -142,15 +149,38 @@ impl ChunkMesh for Mesh<VoxelVertex> {
     }
 
     #[inline(always)]
-    fn push_face(&mut self, dir: Direction, pos: IVec3, block: Block) {
-        for pos in Quad::from_direction(dir, pos.as_vec3(), Vec3::ONE).corners {
-            let vertex_data = pos[0] as u32
-                | (pos[1] as u32) << 6
-                | (pos[2] as u32) << 12
-                | (dir as u32) << 18
-                | (block as u32) << 21;
+    fn push_face(
+        &mut self,
+        chunk: &Chunk,
+        dir: Direction,
+        pos: IVec3,
+        block: Block,
+        noises: &NoiseFunctions,
+    ) {
+        let ambient_corners = chunk.ambient_corner_voxels(dir, pos, noises);
+        for (i, pos) in Quad::from_direction(dir, pos.as_vec3(), Vec3::ONE)
+            .corners
+            .iter()
+            .enumerate()
+        {
+            let index = i * 2;
 
-            self.vertices.push(VoxelVertex { vertex_data });
+            let side_1 = ambient_corners[index] as u8;
+            let side_2 = ambient_corners[(index + 2) % 8] as u8;
+            let side_corner = ambient_corners[(index + 1) % 8] as u8;
+            let mut ao_count = side_1 + side_2 + side_corner;
+            if side_1 == 1 && side_2 == 1 {
+                ao_count = 3;
+            }
+
+            self.vertices.push(VoxelVertex {
+                vertex_data: pos[0] as u32
+                    | (pos[1] as u32) << 6
+                    | (pos[2] as u32) << 12
+                    | (dir as u32) << 18
+                    | (ao_count as u32) << 21
+                    | (block as u32) << 23,
+            });
         }
     }
 }
@@ -164,6 +194,71 @@ impl Chunk {
         }
     }
 
+    fn get_block(
+        &self,
+        relative_pos: IVec3,
+        fallback: Option<&Chunk>,
+        noises: &NoiseFunctions,
+    ) -> Block {
+        let (nx, ny, nz) = (relative_pos.x, relative_pos.y, relative_pos.z);
+        if (0..CHUNK_SIZE).contains(&nx)
+            && (0..CHUNK_SIZE).contains(&ny)
+            && (0..CHUNK_SIZE).contains(&nz)
+        {
+            return *unsafe {
+                self.blocks
+                    .get_unchecked(vec3_to_index(IVec3::new(nx, ny, nz)))
+            };
+        }
+
+        let mut chunk_x = self.pos.x;
+        let mut chunk_y = self.pos.y;
+        let mut chunk_z = self.pos.z;
+        let mut lx = nx;
+        let mut ly = ny;
+        let mut lz = nz;
+
+        if nx < 0 {
+            lx += CHUNK_SIZE;
+            chunk_x -= 1;
+        } else if nx >= CHUNK_SIZE {
+            lx -= CHUNK_SIZE;
+            chunk_x += 1;
+        }
+
+        if ny < 0 {
+            ly += CHUNK_SIZE;
+            chunk_y -= 1;
+        } else if ny >= CHUNK_SIZE {
+            ly -= CHUNK_SIZE;
+            chunk_y += 1;
+        }
+
+        if nz < 0 {
+            lz += CHUNK_SIZE;
+            chunk_z -= 1;
+        } else if nz >= CHUNK_SIZE {
+            lz -= CHUNK_SIZE;
+            chunk_z += 1;
+        }
+
+        if let Some(chunk) = fallback {
+            return *unsafe {
+                chunk
+                    .blocks
+                    .get_unchecked(vec3_to_index(IVec3::new(lx, ly, lz)))
+            };
+        }
+
+        let world_pos = IVec3::new(
+            chunk_x * CHUNK_SIZE + lx,
+            chunk_y * CHUNK_SIZE + ly,
+            chunk_z * CHUNK_SIZE + lz,
+        );
+        let (max_y, _biome) = terrain_noise(world_pos.xz().as_vec2(), noises);
+        generate_block_at(world_pos, max_y)
+    }
+
     #[inline(always)]
     pub fn get_adjacent_blocks(
         &self,
@@ -173,78 +268,35 @@ impl Chunk {
         down_chunk: Option<&Chunk>,
         noises: &NoiseFunctions,
     ) -> (Block, Block, Block) {
-        let x = pos.x;
-        let y = pos.y;
-        let z = pos.z;
-
-        let get_block = |dx: i32, dy: i32, dz: i32, fallback: Option<&Chunk>| -> Block {
-            let nx = x + dx;
-            let ny = y + dy;
-            let nz = z + dz;
-
-            if (0..CHUNK_SIZE).contains(&nx)
-                && (0..CHUNK_SIZE).contains(&ny)
-                && (0..CHUNK_SIZE).contains(&nz)
-            {
-                return *unsafe {
-                    self.blocks
-                        .get_unchecked(vec3_to_index(IVec3::new(nx, ny, nz)))
-                };
-            }
-
-            let mut chunk_x = self.pos.x;
-            let mut chunk_y = self.pos.y;
-            let mut chunk_z = self.pos.z;
-            let mut lx = nx;
-            let mut ly = ny;
-            let mut lz = nz;
-
-            if nx < 0 {
-                lx += CHUNK_SIZE;
-                chunk_x -= 1;
-            } else if nx >= CHUNK_SIZE {
-                lx -= CHUNK_SIZE;
-                chunk_x += 1;
-            }
-
-            if ny < 0 {
-                ly += CHUNK_SIZE;
-                chunk_y -= 1;
-            } else if ny >= CHUNK_SIZE {
-                ly -= CHUNK_SIZE;
-                chunk_y += 1;
-            }
-
-            if nz < 0 {
-                lz += CHUNK_SIZE;
-                chunk_z -= 1;
-            } else if nz >= CHUNK_SIZE {
-                lz -= CHUNK_SIZE;
-                chunk_z += 1;
-            }
-
-            if let Some(chunk) = fallback {
-                return *unsafe {
-                    chunk
-                        .blocks
-                        .get_unchecked(vec3_to_index(IVec3::new(lx, ly, lz)))
-                };
-            }
-
-            let world_pos = IVec3::new(
-                chunk_x * CHUNK_SIZE + lx,
-                chunk_y * CHUNK_SIZE + ly,
-                chunk_z * CHUNK_SIZE + lz,
-            );
-            let (max_y, _biome) = terrain_noise(world_pos.xz().as_vec2(), noises);
-            generate_block_at(world_pos, max_y)
-        };
-
-        let back = get_block(0, 0, -1, back_chunk);
-        let left = get_block(-1, 0, 0, left_chunk);
-        let down = get_block(0, -1, 0, down_chunk);
+        let back = self.get_block(pos - IVec3::Z, back_chunk, noises);
+        let left = self.get_block(pos - IVec3::X, left_chunk, noises);
+        let down = self.get_block(pos - IVec3::Y, down_chunk, noises);
 
         (back, left, down)
+    }
+
+    pub fn ambient_corner_voxels(
+        &self,
+        dir: Direction,
+        pos: IVec3,
+        noises: &NoiseFunctions,
+    ) -> [bool; 8] {
+        #[rustfmt::skip]
+        let positions = match dir {
+            Direction::Left => [ivec3(-1,0,-1),ivec3(-1,-1,-1),ivec3(-1,-1,0),ivec3(-1,-1,1),ivec3(-1,0,1),ivec3(-1,1,1),ivec3(-1, 1, 0),ivec3(-1,1,-1),],
+            Direction::Bottom => [ivec3(-1, -1, 0),ivec3(-1, -1, -1),ivec3(0, -1, -1), ivec3(1,-1,-1),ivec3(1,-1,0),ivec3(1, -1, 1),ivec3(0,-1,1),ivec3(-1,-1,1),],
+            Direction::Back => [ivec3(0,-1,-1),ivec3(-1,-1,-1),ivec3(-1,0,-1),ivec3(-1,1,-1), ivec3(0,1,-1), ivec3(1,1,-1),ivec3(1,0,-1), ivec3(1,-1,-1)],
+
+            Direction::Right => [ivec3(0,0,-1), ivec3(0,1,-1), ivec3(0,1,0), ivec3(0,1,1),ivec3(0,0,1),ivec3(0,-1,1),ivec3(0,-1,0),ivec3(0,-1,-1)],
+            Direction::Top => [ivec3(-1,0,0),ivec3(-1,0,1),ivec3(0,0,1),ivec3(1,0,1),ivec3(1,0,0),ivec3(1,0,-1),ivec3(0,0,-1),ivec3(-1,0,-1),],
+            Direction::Front => [ivec3(0,-1,0),ivec3(1,-1,0),ivec3(1,0,0),ivec3(1,1,0),ivec3(0,1,0),ivec3(-1,1,0),ivec3(-1,0,0),ivec3(-1,-1,0),],
+        };
+
+        let mut result = [false; 8];
+        for i in 0..8 {
+            result[i] = !self.get_block(pos + positions[i], None, noises).is_air();
+        }
+        result
     }
 }
 

@@ -6,6 +6,7 @@
 ## Features
 - 3D Perspective Camera
 - Diffuse and Specular Lighting
+- Ambient Occlusion
 - Optimized Meshing
 - Blazingly Fast Terrain Generation
 - Small UI Abstractions
