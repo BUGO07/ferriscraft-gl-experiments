@@ -5,6 +5,7 @@ layout(location = 0) in uint vertex_data;
 out vec3 v_pos;
 out vec3 v_normal;
 out vec2 v_uv;
+out float v_ao;
 
 flat out uint v_block_id;
 
@@ -22,6 +23,8 @@ const vec3 normals[6] = vec3[6](
     vec3(0, 1, 0), 
     vec3(0, 0,-1), 
     vec3(0, 0, 1));
+
+const vec4 ambient_lerps = vec4(1.0,0.7,0.5,0.15);
 
 vec2 get_uv(int normal, int block_id) {
     float face_idx = 1.0;
@@ -50,7 +53,8 @@ vec2 get_uv(int normal, int block_id) {
 
 void main() {
     uint normal = (vertex_data >> 18) & 7u;
-    uint block_id  = (vertex_data >> 21) & 63u;
+    uint ao = (vertex_data >> 21) & 3u;
+    uint block_id = (vertex_data >> 23) & 63u;
 
     vec3 pos = vec3(float(vertex_data & 63u), float((vertex_data >> 6)  & 63u), float((vertex_data >> 12) & 63u));
     vec3 n = normals[int(normal)];
@@ -61,5 +65,6 @@ void main() {
     v_pos = gl_Position.xyz / gl_Position.w;
     v_normal = normalize(transpose(inverse(mat3(modelview))) * n);
     v_block_id = block_id;
+    v_ao = ambient_lerps[ao];
     v_uv = get_uv(int(normal), int(block_id));
 }
