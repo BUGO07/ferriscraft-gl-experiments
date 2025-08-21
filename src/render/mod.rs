@@ -5,83 +5,18 @@ use glium::{
 };
 
 use crate::{
-    App, CHUNK_SIZE,
+    App,
     ecs::*,
-    utils::{Quad, frustum_planes, should_cull},
-    world::mesher::{UIVertex, VoxelVertex},
+    ui::{UIRect, UIVertex},
+    utils::{frustum_planes, should_cull},
+    world::mesher::VoxelVertex,
 };
 
 mod inspector;
 
 pub fn render_plugin(app: &mut App) {
-    app.add_systems(Startup, setup)
-        .add_systems(EguiContextPass, inspector::handle_egui)
+    app.add_systems(EguiContextPass, inspector::handle_egui)
         .add_systems(RenderUpdate, render_update);
-}
-
-fn setup(
-    mut commands: Commands,
-    mut ui_meshes: NonSendMut<Meshes<UIVertex>>,
-    mut materials: NonSendMut<Materials>,
-    window: NonSend<NSWindow>,
-) {
-    commands.spawn((
-        Camera3d {
-            fov: 60.0,
-            near: 0.1,
-            far: 1024.0,
-        },
-        Transform::from_xyz(0.0, (4 * CHUNK_SIZE + 10) as f32, 5.5)
-            .looking_at(Vec3::Y * (8 * CHUNK_SIZE) as f32, Vec3::Y),
-    ));
-
-    commands.spawn((
-        DirectionalLight {
-            illuminance: 1000.0,
-        },
-        Transform::DEFAULT.with_rotation(
-            Quat::from_rotation_x(45_f32.to_radians())
-                * Quat::from_rotation_y(-30_f32.to_radians()),
-        ),
-    ));
-
-    let ui_material = materials.add(Material::new(&window.facade, "ui", None));
-
-    commands.spawn(UIRect::new(
-        Val::Percent(0.0),
-        Val::Percent(0.0),
-        Val::Px(80.0),
-        Val::Px(80.0),
-        ui_material,
-    ));
-
-    commands.spawn(UIRect::new(
-        Val::Percent(50.0),
-        Val::Percent(50.0),
-        Val::Percent(1.0),
-        Val::Percent(1.0),
-        ui_material,
-    ));
-
-    let verts = Quad::DEFAULT
-        .corners
-        .iter()
-        .enumerate()
-        .map(|c| UIVertex { corner: c.0 as u32 })
-        .collect::<Vec<_>>();
-
-    let inds = (0..verts.len())
-        .step_by(4)
-        .flat_map(|i| {
-            let idx = i as u32;
-            [idx, idx + 1, idx + 2, idx, idx + 2, idx + 3]
-        })
-        .collect::<Vec<_>>();
-
-    ui_meshes.add(Mesh::new(verts, inds), &window.facade);
-
-    // materials[1]
-    materials.add(Material::new(&window.facade, "voxel", Some("atlas.png")));
 }
 
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]

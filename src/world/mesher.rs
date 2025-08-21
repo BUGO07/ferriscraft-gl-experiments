@@ -4,8 +4,10 @@ use glam::*;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
-    CHUNK_SIZE,
-    utils::{Quad, index_to_vec3, vec3_to_index},
+    CHUNK_SIZE, SEA_LEVEL,
+    ecs::Mesh,
+    utils::{Quad, generate_block_at, index_to_vec3, vec3_to_index},
+    world::NoiseFunctions,
 };
 
 #[derive(Clone)]
@@ -47,12 +49,6 @@ pub enum Direction {
     Front,
 }
 
-#[derive(Default)]
-pub struct ChunkMesh {
-    pub vertices: Vec<VoxelVertex>,
-    pub indices: Vec<u32>,
-}
-
 #[derive(Clone, Copy, Debug, Default)]
 pub struct VoxelVertex {
     pub vertex_data: u32,
@@ -60,20 +56,22 @@ pub struct VoxelVertex {
 
 implement_vertex!(VoxelVertex, vertex_data);
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct UIVertex {
-    pub corner: u32,
-}
-
-implement_vertex!(UIVertex, corner);
-
-impl ChunkMesh {
-    pub fn build(
-        mut self,
+pub trait ChunkMesh {
+    fn build(
         chunk: &Chunk,
         chunks: &HashMap<IVec3, Chunk>,
-        // _noises: &NoiseFunctions,
-    ) -> Option<Self> {
+        noises: &NoiseFunctions,
+    ) -> Option<Mesh<VoxelVertex>>;
+
+    fn push_face(&mut self, dir: Direction, pos: IVec3, block: Block);
+}
+
+impl ChunkMesh for Mesh<VoxelVertex> {
+    fn build(
+        chunk: &Chunk,
+        chunks: &HashMap<IVec3, Chunk>,
+        noises: &NoiseFunctions,
+    ) -> Option<Mesh<VoxelVertex>> {
         let chunk_pos = chunk.pos;
 
         let left_chunk = chunks.get(&(chunk_pos + IVec3::new(-1, 0, 0)));
@@ -81,17 +79,17 @@ impl ChunkMesh {
         let down_chunk = chunks.get(&(chunk_pos + IVec3::new(0, -1, 0)));
 
         // parallelized (thanks rayon)
-        let mesh_parts: Vec<ChunkMesh> = (0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
+        let mesh_parts = (0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
             .into_par_iter()
             .filter_map(|i| {
-                let mut local_mesh = ChunkMesh::default();
+                let mut local_mesh = Mesh::default();
 
                 let pos = index_to_vec3(i as usize);
 
                 let current = *unsafe { chunk.blocks.get_unchecked(i as usize) };
 
                 let (back, left, down) =
-                    chunk.get_adjacent_blocks(pos, left_chunk, back_chunk, down_chunk);
+                    chunk.get_adjacent_blocks(pos, left_chunk, back_chunk, down_chunk, noises);
 
                 // TODO fix this so water works properly
                 if !current.is_air() {
@@ -122,28 +120,29 @@ impl ChunkMesh {
                     Some(local_mesh)
                 }
             })
-            .collect();
+            .collect::<Vec<_>>();
 
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
         for part in mesh_parts {
-            self.vertices.extend(part.vertices);
+            vertices.extend(part.vertices);
         }
 
-        if self.vertices.is_empty() {
+        if vertices.is_empty() {
             None
         } else {
-            self.vertices.shrink_to_fit();
-            self.indices
-                .extend((0..self.vertices.len()).step_by(4).flat_map(|i| {
-                    let idx = i as u32;
-                    [idx, idx + 1, idx + 2, idx, idx + 2, idx + 3]
-                }));
+            vertices.shrink_to_fit();
+            indices.extend((0..vertices.len()).step_by(4).flat_map(|i| {
+                let idx = i as u32;
+                [idx, idx + 1, idx + 2, idx, idx + 2, idx + 3]
+            }));
 
-            Some(self)
+            Some(Mesh::new(vertices, indices))
         }
     }
 
     #[inline(always)]
-    pub fn push_face(&mut self, dir: Direction, pos: IVec3, block: Block) {
+    fn push_face(&mut self, dir: Direction, pos: IVec3, block: Block) {
         for pos in Quad::from_direction(dir, pos.as_vec3(), Vec3::ONE).corners {
             let vertex_data = pos[0] as u32
                 | (pos[1] as u32) << 6
@@ -172,6 +171,7 @@ impl Chunk {
         left_chunk: Option<&Chunk>,
         back_chunk: Option<&Chunk>,
         down_chunk: Option<&Chunk>,
+        noises: &NoiseFunctions,
     ) -> (Block, Block, Block) {
         let x = pos.x;
         let y = pos.y;
@@ -192,26 +192,35 @@ impl Chunk {
                 };
             }
 
+            let mut chunk_x = self.pos.x;
+            let mut chunk_y = self.pos.y;
+            let mut chunk_z = self.pos.z;
             let mut lx = nx;
             let mut ly = ny;
             let mut lz = nz;
 
             if nx < 0 {
                 lx += CHUNK_SIZE;
+                chunk_x -= 1;
             } else if nx >= CHUNK_SIZE {
                 lx -= CHUNK_SIZE;
+                chunk_x += 1;
             }
 
             if ny < 0 {
                 ly += CHUNK_SIZE;
+                chunk_y -= 1;
             } else if ny >= CHUNK_SIZE {
                 ly -= CHUNK_SIZE;
+                chunk_y += 1;
             }
 
             if nz < 0 {
                 lz += CHUNK_SIZE;
+                chunk_z -= 1;
             } else if nz >= CHUNK_SIZE {
                 lz -= CHUNK_SIZE;
+                chunk_z += 1;
             }
 
             if let Some(chunk) = fallback {
@@ -222,7 +231,13 @@ impl Chunk {
                 };
             }
 
-            Block::Air
+            let world_pos = IVec3::new(
+                chunk_x * CHUNK_SIZE + lx,
+                chunk_y * CHUNK_SIZE + ly,
+                chunk_z * CHUNK_SIZE + lz,
+            );
+            let (max_y, _biome) = terrain_noise(world_pos.xz().as_vec2(), noises);
+            generate_block_at(world_pos, max_y)
         };
 
         let back = get_block(0, 0, -1, back_chunk);
@@ -231,4 +246,49 @@ impl Chunk {
 
         (back, left, down)
     }
+}
+
+const OCEAN_MIN_HEIGHT: f32 = SEA_LEVEL as f32 - 40.0;
+const OCEAN_MAX_HEIGHT: f32 = SEA_LEVEL as f32 + 5.0;
+const OCEAN_FLATTENING_EXPONENT: f32 = 4.0;
+const PLAINS_MIN_HEIGHT: f32 = SEA_LEVEL as f32 + 10.0;
+const PLAINS_MAX_HEIGHT: f32 = SEA_LEVEL as f32 + 40.0;
+const PLAINS_FLATTENING_EXPONENT: f32 = 3.0;
+const MOUNTAIN_MIN_HEIGHT: f32 = SEA_LEVEL as f32 + 50.0;
+const MOUNTAIN_MAX_HEIGHT: f32 = SEA_LEVEL as f32 + 180.0;
+const MOUNTAIN_FLATTENING_EXPONENT: f32 = 1.5;
+const OCEAN_PLAINS_THRESHOLD: f32 = 0.4;
+const PLAINS_MOUNTAIN_THRESHOLD: f32 = 0.6;
+
+// TODO make this better
+#[inline]
+// max_y, biome
+pub fn terrain_noise(pos: Vec2, noises: &NoiseFunctions) -> (i32, f32) {
+    let terrain_fbm = (noises.terrain.gen_single_2d(pos.x, pos.y, noises.seed) + 1.0) / 2.0;
+    let biome_fbm = (noises.biome.gen_single_2d(pos.x, pos.y, noises.seed + 1) + 1.0) / 2.0;
+
+    let min_height: f32;
+    let max_height: f32;
+    let flattening_exp: f32;
+
+    if biome_fbm < OCEAN_PLAINS_THRESHOLD {
+        let t = biome_fbm / OCEAN_PLAINS_THRESHOLD;
+        min_height = OCEAN_MIN_HEIGHT.lerp(PLAINS_MIN_HEIGHT, t);
+        max_height = OCEAN_MAX_HEIGHT.lerp(PLAINS_MAX_HEIGHT, t);
+        flattening_exp = OCEAN_FLATTENING_EXPONENT.lerp(PLAINS_FLATTENING_EXPONENT, t);
+    } else if biome_fbm < PLAINS_MOUNTAIN_THRESHOLD {
+        let t = (biome_fbm - OCEAN_PLAINS_THRESHOLD)
+            / (PLAINS_MOUNTAIN_THRESHOLD - OCEAN_PLAINS_THRESHOLD);
+        min_height = PLAINS_MIN_HEIGHT.lerp(MOUNTAIN_MIN_HEIGHT, t);
+        max_height = PLAINS_MAX_HEIGHT.lerp(MOUNTAIN_MAX_HEIGHT, t);
+        flattening_exp = PLAINS_FLATTENING_EXPONENT.lerp(MOUNTAIN_FLATTENING_EXPONENT, t);
+    } else {
+        min_height = MOUNTAIN_MIN_HEIGHT;
+        max_height = MOUNTAIN_MAX_HEIGHT;
+        flattening_exp = MOUNTAIN_FLATTENING_EXPONENT;
+    }
+
+    let height = min_height + terrain_fbm.powf(flattening_exp) * (max_height - min_height);
+
+    (height as i32, biome_fbm)
 }
