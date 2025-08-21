@@ -6,14 +6,14 @@ use crate::{
     ecs::*,
     utils::{generate_block_at, vec3_to_index},
     world::{
-        ChunkMarker, ComputeChunk, ComputeChunkMesh, GameInfo, NoiseFunctions,
+        ChunkMarker, ComputeChunk, ComputeChunkMesh, NoiseFunctions, WorldData,
         mesher::{Chunk, ChunkMesh, VoxelVertex, terrain_noise},
     },
 };
 
 pub fn handle_chunk_gen(
     mut commands: Commands,
-    game_info: Res<GameInfo>,
+    world_data: Res<WorldData>,
     noises: Res<NoiseFunctions>,
     player: Single<&Transform, With<Camera3d>>,
 ) {
@@ -28,7 +28,7 @@ pub fn handle_chunk_gen(
             for chunk_x in (player_chunk.x - render_distance)..(player_chunk.x + render_distance) {
                 let pos = ivec3(chunk_x, chunk_y, chunk_z);
 
-                if let Ok(guard) = game_info.chunks.read() {
+                if let Ok(guard) = world_data.chunks.read() {
                     if guard.contains_key(&pos) {
                         continue;
                     }
@@ -36,7 +36,7 @@ pub fn handle_chunk_gen(
                     continue;
                 };
 
-                if let Ok(guard) = game_info.loading_chunks.read() {
+                if let Ok(guard) = world_data.loading_chunks.read() {
                     if guard.contains(&pos) {
                         continue;
                     }
@@ -45,13 +45,13 @@ pub fn handle_chunk_gen(
                 };
 
                 {
-                    game_info.loading_chunks.write().unwrap().insert(pos);
+                    world_data.loading_chunks.write().unwrap().insert(pos);
                 }
 
                 chunks_to_load.push(pos);
 
-                // let chunks = game_info.chunks.clone();
-                // let saved_chunks = game_info.saved_chunks.clone();
+                // let chunks = world_data.chunks.clone();
+                // let saved_chunks = world_data.saved_chunks.clone();
                 let noises = noises.clone();
 
                 let task = thread_pool.spawn(async move {
@@ -150,7 +150,7 @@ pub fn handle_chunk_gen(
 
 pub fn handle_mesh_gen(
     mut commands: Commands,
-    game_info: Res<GameInfo>,
+    world_data: Res<WorldData>,
     noises: Res<NoiseFunctions>,
     query: Query<(Entity, &Transform), Added<ChunkMarker>>,
 ) {
@@ -159,7 +159,7 @@ pub fn handle_mesh_gen(
     for (entity, transform) in query {
         let pos = transform.translation.as_ivec3() / CHUNK_SIZE;
 
-        let chunks = game_info.chunks.clone();
+        let chunks = world_data.chunks.clone();
         let noises = noises.clone();
 
         let task = thread_pool.spawn(async move {
@@ -181,7 +181,7 @@ pub fn handle_mesh_gen(
 #[allow(clippy::type_complexity)]
 pub fn handle_chunk_despawn(
     mut commands: Commands,
-    game_info: Res<GameInfo>,
+    world_data: Res<WorldData>,
     query: Query<
         (Entity, &Transform),
         Or<(
@@ -195,8 +195,8 @@ pub fn handle_chunk_despawn(
     let player_chunk = player.translation.as_ivec3() / CHUNK_SIZE;
     let render_distance = 8;
 
-    let mut chunks = game_info.chunks.write().unwrap();
-    let mut loading_chunks = game_info.loading_chunks.write().unwrap();
+    let mut chunks = world_data.chunks.write().unwrap();
+    let mut loading_chunks = world_data.loading_chunks.write().unwrap();
 
     for (entity, transform) in query {
         let chunk_pos = transform.translation.as_ivec3() / CHUNK_SIZE;
@@ -231,7 +231,7 @@ pub fn process_tasks(
     player: Single<&Transform, With<Camera3d>>,
     mesh_tasks: Query<(Entity, &mut ComputeChunkMesh)>,
     spawn_tasks: Query<(Entity, &mut ComputeChunk)>,
-    game_info: Res<GameInfo>,
+    world_data: Res<WorldData>,
     ns_window: NonSend<NSWindow>,
 ) {
     // GENERATING CHUNKS
@@ -240,12 +240,12 @@ pub fn process_tasks(
     let mut tasks = spawn_tasks.into_iter().collect::<Vec<_>>();
     tasks.par_sort_by_cached_key(|(_, x)| x.1.distance_squared(pt));
 
-    let mut chunks = game_info.chunks.write().unwrap();
-    // let mut saved_chunks = game_info
+    let mut chunks = world_data.chunks.write().unwrap();
+    // let mut saved_chunks = world_data
     //     .saved_chunks
     //     .as_ref()
     //     .map(|saved_chunks| saved_chunks.write().unwrap());
-    let mut loading_chunks = game_info.loading_chunks.write().unwrap();
+    let mut loading_chunks = world_data.loading_chunks.write().unwrap();
 
     let mut processed_this_frame = 0;
     for (entity, mut compute_task) in tasks {
@@ -271,7 +271,7 @@ pub fn process_tasks(
             //     *e = commands
             //         .spawn((
             //             *game_entity,
-            //             SceneRoot(game_info.models[game_entity.kind as usize].clone()),
+            //             SceneRoot(world_data.models[game_entity.kind as usize].clone()),
             //             Transform::from_translation(game_entity.pos + vec3(0.5, 0.0, 0.5))
             //                 .with_scale(Vec3::splat(2.0))
             //                 .with_rotation(Quat::from_rotation_y(game_entity.rot)),
@@ -317,7 +317,7 @@ pub fn process_tasks(
                         Mesh::new(mesh_data.vertices, mesh_data.indices),
                         &ns_window.facade,
                     ),
-                    MeshMaterial(0), // MeshMaterial3d(game_info.materials[0].clone()),
+                    MeshMaterial(0), // MeshMaterial3d(world_data.materials[0].clone()),
                                      // Visibility::Visible,
                 ));
             }

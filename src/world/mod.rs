@@ -19,7 +19,7 @@ pub mod generation;
 pub mod mesher;
 
 pub fn world_plugin(app: &mut App) {
-    app.init_resource::<GameInfo>()
+    app.init_resource::<WorldData>()
         .insert_resource(NoiseFunctions {
             seed: 1337,
             terrain: GeneratorWrapper(Simplex)
@@ -47,7 +47,7 @@ pub fn world_plugin(app: &mut App) {
 }
 
 #[derive(Resource, Default)]
-pub struct GameInfo {
+pub struct WorldData {
     pub chunks: Arc<RwLock<HashMap<IVec3, Chunk>>>,
     pub loading_chunks: Arc<RwLock<HashSet<IVec3>>>,
 }
