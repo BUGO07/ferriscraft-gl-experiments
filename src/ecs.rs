@@ -34,11 +34,15 @@ pub struct DebugInfo {
 #[derive(Resource, Debug, Default)]
 pub struct Time {
     pub delta: Duration,
+    pub elapsed: f32,
 }
 
 impl Time {
     pub fn delta_secs(&self) -> f32 {
         self.delta.as_secs_f32()
+    }
+    pub fn elapsed_secs(&self) -> f32 {
+        self.elapsed
     }
 }
 

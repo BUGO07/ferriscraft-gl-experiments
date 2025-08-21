@@ -22,7 +22,7 @@ pub fn render_plugin(app: &mut App) {
 
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 fn render_update(
-    window: NonSend<NSWindow>,
+    ns_window: NonSend<NSWindow>,
     ui_meshes: NonSend<Meshes<UIVertex>>,
     voxel_meshes: NonSend<Meshes<VoxelVertex>>,
     materials: NonSend<Materials>,
@@ -35,10 +35,20 @@ fn render_update(
     ui_query: Query<&UIRect>,
     debug_info: Option<ResMut<DebugInfo>>,
     keyboard: Res<KeyboardInput>,
+    time: Res<Time>,
     mut egui: NonSendMut<EguiGlium>,
+    mut last_frames: Local<(u32, f32)>, // frame amount accumulated, last_time
     mut apply_ao: Local<bool>,
 ) {
-    let mut target = window.facade.draw();
+    last_frames.0 += 1;
+    if last_frames.1 + 1.0 < time.elapsed_secs() {
+        ns_window
+            .winit
+            .set_title(format!("FerrisCraft GL - FPS: {}", last_frames.0).as_str()); // maybe update ui instead of title
+        last_frames.1 = time.elapsed_secs();
+        last_frames.0 = 0;
+    }
+    let mut target = ns_window.facade.draw();
     target.clear_color_and_depth((0.44, 0.73, 0.88, 1.0), 1.0);
     let (width, height) = target.get_dimensions();
 
@@ -161,6 +171,6 @@ fn render_update(
         debug_info.indices = indices;
         debug_info.draw_calls = draw_calls;
     }
-    egui.paint(&window.facade, &mut target);
+    egui.paint(&ns_window.facade, &mut target);
     target.finish().unwrap();
 }
