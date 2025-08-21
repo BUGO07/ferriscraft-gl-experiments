@@ -194,7 +194,7 @@ impl Chunk {
         }
     }
 
-    fn get_block(
+    fn get_relative_block(
         &self,
         relative_pos: IVec3,
         fallback: Option<&Chunk>,
@@ -268,9 +268,9 @@ impl Chunk {
         down_chunk: Option<&Chunk>,
         noises: &NoiseFunctions,
     ) -> (Block, Block, Block) {
-        let back = self.get_block(pos - IVec3::Z, back_chunk, noises);
-        let left = self.get_block(pos - IVec3::X, left_chunk, noises);
-        let down = self.get_block(pos - IVec3::Y, down_chunk, noises);
+        let back = self.get_relative_block(pos - IVec3::Z, back_chunk, noises);
+        let left = self.get_relative_block(pos - IVec3::X, left_chunk, noises);
+        let down = self.get_relative_block(pos - IVec3::Y, down_chunk, noises);
 
         (back, left, down)
     }
@@ -294,7 +294,9 @@ impl Chunk {
 
         let mut result = [false; 8];
         for i in 0..8 {
-            result[i] = !self.get_block(pos + positions[i], None, noises).is_air();
+            result[i] = !self
+                .get_relative_block(pos + positions[i], None, noises)
+                .is_air();
         }
         result
     }

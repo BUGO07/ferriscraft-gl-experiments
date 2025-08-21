@@ -17,12 +17,12 @@ const float ATLAS_SIZE_X = 3.0;
 const float ATLAS_SIZE_Y = 10.0;
 
 const vec3 normals[6] = vec3[6](
-    vec3(-1, 0, 0), 
-    vec3(1, 0, 0), 
-    vec3(0,-1, 0), 
-    vec3(0, 1, 0), 
-    vec3(0, 0,-1), 
-    vec3(0, 0, 1));
+    vec3(-1.0, 0.0, 0.0), 
+    vec3(1.0, 0.0, 0.0), 
+    vec3(0.0,-1.0, 0.0), 
+    vec3(0.0, 1.0, 0.0), 
+    vec3(0.0, 0.0,-1.0), 
+    vec3(0.0, 0.0, 1.0));
 
 const vec4 ambient_lerps = vec4(1.0,0.7,0.5,0.15);
 
@@ -39,24 +39,20 @@ vec2 get_uv(int normal, int block_id) {
         vec2(pos.x + 1.0 / ATLAS_SIZE_X, pos.y),
         vec2(pos.x + 1.0 / ATLAS_SIZE_X, pos.y + 1.0 / ATLAS_SIZE_Y));
 
+    if (normal == 5 || normal == 4) return base[(gl_VertexID + 2) % 4];
+    else if (normal == 0) return base[(gl_VertexID + 1) % 4];
     // my formatter breaks if i dont put the curly braces {}
-    if (normal == 5 || normal == 4) {
-        return base[(gl_VertexID + 2) % 4];
-    }
-    else if (normal == 0) {
-        return base[(gl_VertexID + 1) % 4];
-    }
     else {
         return base[(gl_VertexID + 3) % 4];
     }
 }
 
 void main() {
+    vec3 pos = vec3(float(vertex_data & 63u), float((vertex_data >> 6)  & 63u), float((vertex_data >> 12) & 63u));
     uint normal = (vertex_data >> 18) & 7u;
     uint ao = (vertex_data >> 21) & 3u;
     uint block_id = (vertex_data >> 23) & 63u;
 
-    vec3 pos = vec3(float(vertex_data & 63u), float((vertex_data >> 6)  & 63u), float((vertex_data >> 12) & 63u));
     vec3 n = normals[int(normal)];
     mat4 modelview = view * model;
 

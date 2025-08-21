@@ -146,7 +146,9 @@ impl ApplicationHandler for App {
                 let now = Instant::now();
                 let delta = now.duration_since(self.last_update);
                 self.fu_accumulator += delta;
-                self.world.resource_mut::<Time>().delta = delta;
+                let mut time = self.world.resource_mut::<Time>();
+                time.delta = delta;
+                time.elapsed += delta.as_secs_f32();
                 self.last_update = now;
 
                 while self.fu_accumulator >= self.fixed_dt {

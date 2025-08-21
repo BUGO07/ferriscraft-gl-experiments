@@ -24,14 +24,10 @@ void main() {
     vec3 diffuse_color = texture(tex, v_uv).xyz;
 
     vec3 ambient_color = diffuse_color * 0.7;
-    if (apply_ao) {
-        ambient_color *= v_ao;
-    }
+    if (apply_ao) ambient_color *= v_ao;
 
     vec3 final_color = ambient_color + diffuse * diffuse_color * u_light.w / 800.0;
-    if (apply_ao) {
-        final_color *= v_ao;
-    }
+    if (apply_ao) final_color *= v_ao;
 
     // check if block is water or something and only then apply specular reflection;
     if (v_block_id == 6u) {
