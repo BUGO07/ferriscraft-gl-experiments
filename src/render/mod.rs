@@ -39,7 +39,7 @@ fn render_update(
     mut apply_ao: Local<bool>,
 ) {
     let mut target = window.facade.draw();
-    target.clear_color_and_depth((0.0, 0.0, 1.0, 1.0), 1.0);
+    target.clear_color_and_depth((0.44, 0.73, 0.88, 1.0), 1.0);
     let (width, height) = target.get_dimensions();
 
     let mut draw_calls = 0;
