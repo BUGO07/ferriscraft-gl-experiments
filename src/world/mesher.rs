@@ -33,8 +33,11 @@ pub enum Block {
 }
 
 impl Block {
-    fn is_air(&self) -> bool {
+    pub fn is_air(&self) -> bool {
         matches!(self, Block::Air)
+    }
+    pub fn is_solid(&self) -> bool {
+        !matches!(self, Block::Air | Block::Water)
     }
 }
 
@@ -47,6 +50,20 @@ pub enum Direction {
     Top,
     Back,
     Front,
+}
+
+impl Direction {
+    const NORMALS: [[i32; 3]; 6] = [
+        [-1, 0, 0],
+        [1, 0, 0],
+        [0, -1, 0],
+        [0, 1, 0],
+        [0, 0, -1],
+        [0, 0, 1],
+    ];
+    pub fn as_ivec3(self) -> IVec3 {
+        IVec3::from(Self::NORMALS[self as usize])
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
