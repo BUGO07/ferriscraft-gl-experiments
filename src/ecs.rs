@@ -147,9 +147,9 @@ pub struct Material {
 impl Material {
     pub fn new(facade: &Display<WindowSurface>, shader: &str, texture_name: Option<&str>) -> Self {
         println!("compiling {shader} shaders...");
-        let vertex_source = std::fs::read(format!("assets/shaders/{}.vert", shader))
+        let vertex_source = std::fs::read(format!("assets/shaders/{shader}.vert"))
             .expect("couldn't find vertex shader");
-        let fragment_source = std::fs::read(format!("assets/shaders/{}.frag", shader))
+        let fragment_source = std::fs::read(format!("assets/shaders/{shader}.frag"))
             .expect("couldn't find fragment shader");
 
         // lmao
@@ -157,7 +157,7 @@ impl Material {
             Texture2d::empty(facade, 64, 64).unwrap(), // idk
             |name| {
                 let image = image::load(
-                    std::io::Cursor::new(std::fs::read(format!("assets/{}", name)).unwrap()),
+                    std::io::Cursor::new(std::fs::read(format!("assets/{name}")).unwrap()),
                     ImageFormat::Png, // probably not gonna change this
                 )
                 .unwrap()

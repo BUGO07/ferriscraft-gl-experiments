@@ -9,11 +9,11 @@
 - Ambient Occlusion
 - Optimized Meshing
 - Blazingly Fast Terrain Generation
+- Block Placing/Breaking
 - Small UI Abstractions
 - Not Much Else
 
 ## TODO
-- Place/Break Blocks
 - Actual UI
 - MultiPlayer
 

@@ -16,6 +16,7 @@ use crate::{
 };
 
 pub mod generation;
+pub mod interaction;
 pub mod mesher;
 
 pub fn world_plugin(app: &mut App) {
