@@ -181,9 +181,10 @@ pub fn handle_mesh_gen(
 #[allow(clippy::type_complexity)]
 pub fn handle_chunk_despawn(
     mut commands: Commands,
+    mut meshes: NonSendMut<Meshes<VoxelVertex>>,
     world_data: Res<WorldData>,
     query: Query<
-        (Entity, &Transform),
+        (Entity, &Transform, Option<&Mesh3d>),
         Or<(
             With<ChunkMarker>,
             With<ComputeChunkMesh>,
@@ -198,7 +199,7 @@ pub fn handle_chunk_despawn(
     let mut chunks = world_data.chunks.write().unwrap();
     let mut loading_chunks = world_data.loading_chunks.write().unwrap();
 
-    for (entity, transform) in query {
+    for (entity, transform, mesh_id) in query {
         let chunk_pos = transform.translation.as_ivec3() / CHUNK_SIZE;
 
         if (chunk_pos.x + render_distance < player_chunk.x)
@@ -217,10 +218,13 @@ pub fn handle_chunk_despawn(
                 //     }
                 // }
             }
+            if let Some(mesh_id) = mesh_id {
+                meshes.0.remove(&mesh_id.0);
+            }
             commands.entity(entity).try_despawn();
 
-            chunks.remove(&chunk_pos);
             loading_chunks.remove(&chunk_pos);
+            chunks.remove(&chunk_pos);
         }
     }
 }

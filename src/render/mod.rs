@@ -38,7 +38,7 @@ fn render_update(
     time: Res<Time>,
     mut egui: NonSendMut<EguiGlium>,
     mut last_frames: Local<(u32, f32)>, // frame amount accumulated, last_time
-    mut apply_ao: Local<bool>,
+    mut disable_ao: Local<bool>,
 ) {
     last_frames.0 += 1;
     if last_frames.1 + 1.0 < time.elapsed_secs() {
@@ -58,7 +58,7 @@ fn render_update(
 
     // temporary
     if keyboard.just_pressed(KeyCode::F1) {
-        *apply_ao = !*apply_ao;
+        *disable_ao = !*disable_ao;
     }
 
     // chunks
@@ -81,7 +81,9 @@ fn render_update(
             if should_cull(&frustum, chunk_transform.translation, aabb) {
                 continue;
             }
-            let (vertex_buffer, index_buffer) = &voxel_meshes.0[mesh_id.0];
+            let Some((vertex_buffer, index_buffer)) = &voxel_meshes.0.get(&mesh_id.0) else {
+                continue;
+            };
             let Material { program, texture } = &materials.0[material_id.0];
 
             let sampler = texture
@@ -95,7 +97,7 @@ fn render_update(
                 perspective: perspective.to_cols_array_2d(),
                 tex: sampler,
                 u_light: (view * Mat4::from_quat(light_transform.rotation) * Vec4::NEG_Z).truncate().normalize().extend(light.illuminance).to_array(),
-                apply_ao: *apply_ao
+                disable_ao: *disable_ao
             };
 
             let params = DrawParameters {
@@ -127,7 +129,10 @@ fn render_update(
         let window_size = vec2(width as f32, height as f32);
 
         for ui_item in ui_query.iter() {
-            let (vertex_buffer, index_buffer) = &ui_meshes.0[0]; // 1x1 quad
+            // 1x1 quad
+            let Some((vertex_buffer, index_buffer)) = &ui_meshes.0.get(&0) else {
+                continue;
+            };
             let Material { program, texture } = &materials.0[ui_item.material.0];
 
             let sampler = texture

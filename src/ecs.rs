@@ -1,4 +1,7 @@
-use std::{collections::HashSet, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
 
 pub use bevy_ecs::{prelude::*, schedule::ScheduleLabel};
 pub use glam::*;
@@ -92,7 +95,10 @@ impl KeyboardInput {
 }
 
 #[derive(Debug, Default)]
-pub struct Meshes<T: Vertex>(pub Vec<(VertexBuffer<T>, IndexBuffer<u32>)>);
+pub struct Meshes<T: Vertex>(
+    pub HashMap<usize, (VertexBuffer<T>, IndexBuffer<u32>)>,
+    pub usize,
+);
 
 impl<T: Vertex> Meshes<T> {
     pub fn add(&mut self, mesh: Mesh<T>, facade: &Display<WindowSurface>) -> Mesh3d {
@@ -103,8 +109,10 @@ impl<T: Vertex> Meshes<T> {
             &mesh.indices,
         )
         .unwrap();
-        self.0.push((vertex_buffer, index_buffer));
-        Mesh3d(self.0.len() - 1)
+        self.0.insert(self.1, (vertex_buffer, index_buffer));
+        let mesh_id = Mesh3d(self.1);
+        self.1 += 1;
+        mesh_id
     }
 }
 
