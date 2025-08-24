@@ -1,8 +1,9 @@
-use glium::winit::event::MouseButton;
+use glfw::MouseButton;
 
 use crate::{
     App, CHUNK_SIZE, SEA_LEVEL,
     ecs::*,
+    render::material::{Material, MaterialOptions},
     utils::set_cursor_grab,
     world::{
         ChunkMarker, NoiseFunctions, WorldData,
@@ -47,7 +48,16 @@ pub fn setup(
     ));
 
     // materials[0]
-    materials.add(Material::new(&ns_window.facade, "voxel", Some("atlas.png")));
+    materials.add(
+        Material::new(
+            "voxel",
+            MaterialOptions {
+                base_texture: Some("assets/atlas.png"),
+                ..Default::default()
+            },
+        )
+        .unwrap(),
+    );
 }
 
 fn handle_interactions(

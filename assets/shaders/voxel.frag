@@ -12,6 +12,7 @@ out vec4 color;
 uniform sampler2D tex;
 uniform vec4 u_light;
 uniform bool disable_ao;
+uniform vec4 base_color;
 
 const vec3 specular_color = vec3(1.0, 1.0, 1.0);
 
@@ -34,8 +35,8 @@ void main() {
         float specular = pow(max(dot(half_direction, normalize(v_normal)), 0.0), 16.0);
         final_color += specular * specular_color * u_light.w / 2500.0; // idk idc
 
-        color = vec4(final_color, 0.6);
+        color = vec4(final_color, 0.6) * base_color;
     } else {
-        color = vec4(final_color, 1.0);
+        color = vec4(final_color, 1.0) * base_color;
     }
 }

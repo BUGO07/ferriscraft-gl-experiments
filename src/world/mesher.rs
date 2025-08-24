@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
+use gl::types::GLuint;
 use glam::*;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
     CHUNK_SIZE, SEA_LEVEL,
-    ecs::Mesh,
     utils::{Quad, generate_block_at, index_to_vec3, vec3_to_index},
     world::NoiseFunctions,
 };
@@ -66,36 +66,18 @@ impl Direction {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct VoxelVertex {
-    pub vertex_data: u32,
+#[derive(Debug, Default)]
+pub struct ChunkMesh {
+    pub vertices: Vec<GLuint>,
+    pub indices: Vec<GLuint>,
 }
 
-implement_vertex!(VoxelVertex, vertex_data);
-
-pub trait ChunkMesh {
-    fn build(
+impl ChunkMesh {
+    pub fn build(
         chunk: &Chunk,
         chunks: &HashMap<IVec3, Chunk>,
         noises: &NoiseFunctions,
-    ) -> Option<Mesh<VoxelVertex>>;
-
-    fn push_face(
-        &mut self,
-        chunk: &Chunk,
-        dir: Direction,
-        pos: IVec3,
-        block: Block,
-        noises: &NoiseFunctions,
-    );
-}
-
-impl ChunkMesh for Mesh<VoxelVertex> {
-    fn build(
-        chunk: &Chunk,
-        chunks: &HashMap<IVec3, Chunk>,
-        noises: &NoiseFunctions,
-    ) -> Option<Mesh<VoxelVertex>> {
+    ) -> Option<Self> {
         let chunk_pos = chunk.pos;
 
         let left_chunk = chunks.get(&(chunk_pos + IVec3::new(-1, 0, 0)));
@@ -106,7 +88,7 @@ impl ChunkMesh for Mesh<VoxelVertex> {
         let mesh_parts = (0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
             .into_par_iter()
             .filter_map(|i| {
-                let mut local_mesh = Mesh::default();
+                let mut local_mesh = ChunkMesh::default();
 
                 let pos = index_to_vec3(i as usize);
 
@@ -161,12 +143,12 @@ impl ChunkMesh for Mesh<VoxelVertex> {
                 [idx, idx + 1, idx + 2, idx, idx + 2, idx + 3]
             }));
 
-            Some(Mesh::new(vertices, indices))
+            Some(Self { vertices, indices })
         }
     }
 
     #[inline(always)]
-    fn push_face(
+    pub fn push_face(
         &mut self,
         chunk: &Chunk,
         dir: Direction,
@@ -190,14 +172,14 @@ impl ChunkMesh for Mesh<VoxelVertex> {
                 ao_count = 3;
             }
 
-            self.vertices.push(VoxelVertex {
-                vertex_data: pos[0] as u32
+            self.vertices.push(
+                pos[0] as u32
                     | (pos[1] as u32) << 6
                     | (pos[2] as u32) << 12
                     | (dir as u32) << 18
                     | (ao_count as u32) << 21
                     | (block as u32) << 23,
-            });
+            );
         }
     }
 }

@@ -7,7 +7,7 @@ use crate::{
     utils::{generate_block_at, vec3_to_index},
     world::{
         ChunkMarker, ComputeChunk, ComputeChunkMesh, NoiseFunctions, WorldData,
-        mesher::{Chunk, ChunkMesh, VoxelVertex, terrain_noise},
+        mesher::{Chunk, ChunkMesh, terrain_noise},
     },
 };
 
@@ -166,7 +166,7 @@ pub fn handle_mesh_gen(
             let guard = chunks.read().unwrap();
             #[cfg(feature = "profile")]
             let instant = std::time::Instant::now();
-            let mesh = Mesh::build(guard.get(&pos)?, &guard, &noises);
+            let mesh = ChunkMesh::build(guard.get(&pos)?, &guard, &noises);
             #[cfg(feature = "profile")]
             println!("Generated chunk in {:?}", instant.elapsed());
             mesh
@@ -181,7 +181,7 @@ pub fn handle_mesh_gen(
 #[allow(clippy::type_complexity)]
 pub fn handle_chunk_despawn(
     mut commands: Commands,
-    mut meshes: NonSendMut<Meshes<VoxelVertex>>,
+    mut meshes: NonSendMut<Meshes>,
     world_data: Res<WorldData>,
     query: Query<
         (Entity, &Transform, Option<&Mesh3d>),
@@ -231,7 +231,7 @@ pub fn handle_chunk_despawn(
 
 pub fn process_tasks(
     mut commands: Commands,
-    mut meshes: NonSendMut<Meshes<VoxelVertex>>,
+    mut meshes: NonSendMut<Meshes>,
     player: Single<&Transform, With<Camera3d>>,
     mesh_tasks: Query<(Entity, &mut ComputeChunkMesh)>,
     spawn_tasks: Query<(Entity, &mut ComputeChunk)>,
@@ -317,10 +317,7 @@ pub fn process_tasks(
 
             if let Some(mesh_data) = result {
                 commands.entity(entity).try_insert((
-                    meshes.add(
-                        Mesh::new(mesh_data.vertices, mesh_data.indices),
-                        &ns_window.facade,
-                    ),
+                    meshes.add(mesh_data),
                     MeshMaterial(0), // MeshMaterial3d(world_data.materials[0].clone()),
                                      // Visibility::Visible,
                 ));

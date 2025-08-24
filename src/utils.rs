@@ -1,5 +1,4 @@
 use glam::*;
-use glium::winit::window::CursorGrabMode;
 
 use crate::{
     CHUNK_SIZE, SEA_LEVEL,
@@ -8,11 +7,7 @@ use crate::{
 };
 
 pub fn set_cursor_grab(window: &mut Window, val: bool) {
-    window.cursor_grab = if val {
-        CursorGrabMode::Locked
-    } else {
-        CursorGrabMode::None
-    };
+    window.cursor_grab = val;
     window.cursor_visible = !val;
 }
 
@@ -75,8 +70,6 @@ pub struct Quad {
 }
 
 impl Quad {
-    pub const DEFAULT: Self = Self::from_direction(Direction::Front, Vec3::ZERO, Vec3::ONE);
-
     #[inline]
     pub const fn from_direction(direction: Direction, pos: Vec3, size: Vec3) -> Self {
         let corners = match direction {
@@ -140,21 +133,4 @@ pub fn should_cull(frustum: &[Vec4; 6], pos: Vec3, aabb: &Aabb) -> bool {
         }
     }
     false
-}
-
-pub fn frustum_planes(view_proj_matrix: &Mat4) -> [Vec4; 6] {
-    let row1 = view_proj_matrix.row(0);
-    let row2 = view_proj_matrix.row(1);
-    let row3 = view_proj_matrix.row(2);
-    let row4 = view_proj_matrix.row(3);
-
-    // left right bottom top near far
-    [
-        row4 + row1,
-        row4 - row1,
-        row4 + row2,
-        row4 - row2,
-        row4 + row3,
-        row4 - row3,
-    ]
 }

@@ -1,4 +1,12 @@
-use crate::{App, ecs::*, utils::Quad};
+use crate::{
+    App,
+    ecs::*,
+    render::{
+        material::{Material, MaterialOptions},
+        mesh::Mesh,
+    },
+    utils::Quad,
+};
 
 pub fn ui_plugin(app: &mut App) {
     app.add_systems(Startup, setup.after(crate::player::setup));
@@ -7,17 +15,17 @@ pub fn ui_plugin(app: &mut App) {
 fn setup(
     mut commands: Commands,
     mut materials: NonSendMut<Materials>,
-    mut ui_meshes: NonSendMut<Meshes<UIVertex>>,
+    mut meshes: NonSendMut<Meshes>,
     ns_window: NonSend<NSWindow>,
 ) {
-    let ui_material = materials.add(Material::new(&ns_window.facade, "ui", None));
+    let material = materials.add(Material::new("ui", MaterialOptions::default()).unwrap());
 
     commands.spawn(UIRect::new(
         Val::Percent(0.0),
         Val::Percent(0.0),
         Val::Px(80.0),
         Val::Px(80.0),
-        ui_material,
+        material,
     ));
 
     commands.spawn(UIRect::new(
@@ -25,32 +33,9 @@ fn setup(
         Val::Percent(50.0),
         Val::Percent(1.0),
         Val::Percent(1.0),
-        ui_material,
+        material,
     ));
-
-    let verts = Quad::DEFAULT
-        .corners
-        .iter()
-        .map(|_| UIVertex::default())
-        .collect::<Vec<_>>();
-
-    let inds = (0..verts.len())
-        .step_by(4)
-        .flat_map(|i| {
-            let idx = i as u32;
-            [idx, idx + 1, idx + 2, idx, idx + 2, idx + 3]
-        })
-        .collect::<Vec<_>>();
-
-    ui_meshes.add(Mesh::new(verts, inds), &ns_window.facade);
 }
-
-#[derive(Clone, Copy, Debug, Default)]
-pub struct UIVertex {
-    dummy: u8, // unneeded
-}
-
-implement_vertex!(UIVertex, dummy);
 
 pub enum Val {
     Percent(f32),

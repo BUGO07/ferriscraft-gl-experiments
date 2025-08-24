@@ -1,4 +1,4 @@
-use glium::winit::keyboard::KeyCode;
+use glfw::Key;
 
 use crate::{ecs::*, utils::set_cursor_grab};
 
@@ -9,7 +9,7 @@ pub fn handle_movement(
     time: Res<Time>,
     mut window: ResMut<Window>,
 ) {
-    if keyboard.just_pressed(KeyCode::Escape) {
+    if keyboard.just_pressed(Key::Escape) {
         let grab = window.cursor_visible;
         set_cursor_grab(&mut window, grab);
     }
@@ -20,22 +20,22 @@ pub fn handle_movement(
     let forward = -Vec3::new(local_z.x, 0.0, local_z.z).normalize_or_zero();
     let right = Vec3::new(local_z.z, 0.0, -local_z.x).normalize_or_zero();
 
-    if keyboard.pressed(KeyCode::KeyW) {
+    if keyboard.pressed(Key::W) {
         move_dir += forward;
     }
-    if keyboard.pressed(KeyCode::KeyS) {
+    if keyboard.pressed(Key::S) {
         move_dir -= forward;
     }
-    if keyboard.pressed(KeyCode::KeyD) {
+    if keyboard.pressed(Key::D) {
         move_dir += right;
     }
-    if keyboard.pressed(KeyCode::KeyA) {
+    if keyboard.pressed(Key::A) {
         move_dir -= right;
     }
-    if keyboard.pressed(KeyCode::Space) {
+    if keyboard.pressed(Key::Space) {
         move_dir += Vec3::Y;
     }
-    if keyboard.pressed(KeyCode::ShiftLeft) {
+    if keyboard.pressed(Key::LeftShift) {
         move_dir -= Vec3::Y;
     }
 
