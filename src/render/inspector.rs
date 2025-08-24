@@ -1,5 +1,3 @@
-use egui_glium::{EguiGlium, egui_winit::egui};
-
 use crate::{ecs::*, ui::UIRect, window::WindowEventECS};
 
 pub fn handle_egui(
@@ -12,10 +10,10 @@ pub fn handle_egui(
     window: NonSend<NSWindow>,
 ) {
     for event in window_events.read() {
-        let _ = egui.on_event(&window.winit, &event.0);
+        let _ = egui.on_event(&window.window, &event.0);
     }
 
-    egui.run(&window.winit, |ctx| {
+    egui.run(&window.window, |ctx| {
         egui::Window::new("change transforms").show(ctx, |ui| {
             ui.add(
                 egui::DragValue::new(&mut camera.1.fov)

@@ -4,27 +4,27 @@ use std::{
 };
 
 pub use bevy_ecs::{prelude::*, schedule::ScheduleLabel};
+use gl::types::GLint;
 pub use glam::*;
 
-use glium::{
-    Display, IndexBuffer, Program, Texture2d, Vertex, VertexBuffer,
-    glutin::surface::WindowSurface,
-    texture::RawImage2d,
-    winit::{event::MouseButton, keyboard::KeyCode, window::CursorGrabMode},
+use glfw::{Glfw, Key, MouseButton, PWindow};
+
+use crate::{
+    render::{material::Material, mesh::Mesh},
+    world::mesher::ChunkMesh,
 };
-use image::ImageFormat;
 
 pub struct NSWindow {
-    pub winit: glium::winit::window::Window,
-    pub facade: Display<WindowSurface>,
+    pub window: PWindow,
+    pub context: Glfw,
 }
 
 #[derive(Resource)]
 pub struct Window {
-    pub cursor_grab: CursorGrabMode,
+    pub cursor_grab: bool,
     pub cursor_visible: bool,
-    pub width: u32,
-    pub height: u32,
+    pub width: GLint,
+    pub height: GLint,
 }
 
 #[derive(Resource, Debug, Default)]
@@ -75,109 +75,44 @@ impl MouseInput {
 
 #[derive(Resource, Debug, Default)]
 pub struct KeyboardInput {
-    pub just_pressesd: HashSet<KeyCode>,
-    pub just_released: HashSet<KeyCode>,
-    pub pressed: HashSet<KeyCode>,
+    pub just_pressesd: HashSet<Key>,
+    pub just_released: HashSet<Key>,
+    pub pressed: HashSet<Key>,
 }
 
 impl KeyboardInput {
-    pub fn just_pressed(&self, key: KeyCode) -> bool {
+    pub fn just_pressed(&self, key: Key) -> bool {
         self.just_pressesd.contains(&key)
     }
 
-    pub fn just_released(&self, key: KeyCode) -> bool {
+    pub fn just_released(&self, key: Key) -> bool {
         self.just_released.contains(&key)
     }
 
-    pub fn pressed(&self, key: KeyCode) -> bool {
+    pub fn pressed(&self, key: Key) -> bool {
         self.pressed.contains(&key)
     }
 }
 
-#[derive(Debug, Default)]
-pub struct Meshes<T: Vertex>(
-    pub HashMap<usize, (VertexBuffer<T>, IndexBuffer<u32>)>,
-    pub usize,
-);
+#[derive(Default)]
+pub struct Meshes(pub HashMap<usize, ChunkMesh>, pub usize);
 
-impl<T: Vertex> Meshes<T> {
-    pub fn add(&mut self, mesh: Mesh<T>, facade: &Display<WindowSurface>) -> Mesh3d {
-        let vertex_buffer = VertexBuffer::new(facade, &mesh.vertices).unwrap();
-        let index_buffer = IndexBuffer::new(
-            facade,
-            glium::index::PrimitiveType::TrianglesList,
-            &mesh.indices,
-        )
-        .unwrap();
-        self.0.insert(self.1, (vertex_buffer, index_buffer));
+impl Meshes {
+    pub fn add(&mut self, mesh: ChunkMesh) -> Mesh3d {
+        self.0.insert(self.1, mesh);
         let mesh_id = Mesh3d(self.1);
         self.1 += 1;
         mesh_id
     }
 }
 
-#[derive(Debug, Default)]
-pub struct Mesh<T: Vertex> {
-    pub vertices: Vec<T>,
-    pub indices: Vec<u32>,
-}
-
-impl<T: Vertex> Mesh<T> {
-    pub fn new(vertices: Vec<T>, indices: Vec<u32>) -> Self {
-        Self { vertices, indices }
-    }
-}
-
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct Materials(pub Vec<Material>);
 
 impl Materials {
     pub fn add(&mut self, material: Material) -> MeshMaterial {
         self.0.push(material);
         MeshMaterial(self.0.len() - 1)
-    }
-}
-
-#[derive(Debug)]
-pub struct Material {
-    pub program: Program,
-    pub texture: Texture2d,
-}
-
-impl Material {
-    pub fn new(facade: &Display<WindowSurface>, shader: &str, texture_name: Option<&str>) -> Self {
-        println!("compiling {shader} shaders...");
-        let vertex_source = std::fs::read(format!("assets/shaders/{shader}.vert"))
-            .expect("couldn't find vertex shader");
-        let fragment_source = std::fs::read(format!("assets/shaders/{shader}.frag"))
-            .expect("couldn't find fragment shader");
-
-        // lmao
-        let texture = texture_name.map_or(
-            Texture2d::empty(facade, 64, 64).unwrap(), // idk
-            |name| {
-                let image = image::load(
-                    std::io::Cursor::new(std::fs::read(format!("assets/{name}")).unwrap()),
-                    ImageFormat::Png, // probably not gonna change this
-                )
-                .unwrap()
-                .to_rgba8();
-                let image_dimensions = image.dimensions();
-                let image = RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
-                Texture2d::new(facade, image).unwrap()
-            },
-        );
-
-        Self {
-            program: Program::from_source(
-                facade,
-                str::from_utf8(&vertex_source).expect("couldn't read vertex shader"),
-                str::from_utf8(&fragment_source).expect("couldn't read fragment shader"),
-                None,
-            )
-            .unwrap(),
-            texture,
-        }
     }
 }
 

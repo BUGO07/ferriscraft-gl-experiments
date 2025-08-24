@@ -12,7 +12,8 @@ use fastnoise2::{
 use crate::{
     App,
     ecs::*,
-    world::mesher::{Chunk, VoxelVertex},
+    render::mesh::Mesh,
+    world::mesher::{Chunk, ChunkMesh},
 };
 
 pub mod generation;
@@ -65,7 +66,7 @@ pub struct NoiseFunctions {
 pub struct ComputeChunk(pub Task<Chunk>, pub IVec3);
 
 #[derive(Component)]
-pub struct ComputeChunkMesh(pub Task<Option<Mesh<VoxelVertex>>>, pub IVec3);
+pub struct ComputeChunkMesh(pub Task<Option<ChunkMesh>>, pub IVec3);
 
 #[derive(Component)]
 pub struct ChunkMarker;

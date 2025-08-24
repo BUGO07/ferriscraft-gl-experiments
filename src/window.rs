@@ -1,8 +1,4 @@
-use glium::winit::{
-    event::{ElementState, WindowEvent},
-    keyboard::PhysicalKey,
-    window::CursorGrabMode,
-};
+use glfw::{Action, WindowEvent};
 
 use crate::{App, ecs::*};
 
@@ -22,45 +18,49 @@ pub fn handle_events(
     mut events: EventReader<WindowEventECS>,
     mut keyboard: ResMut<KeyboardInput>,
     mut mouse: ResMut<MouseInput>,
-    ns_window: NonSend<NSWindow>,
+    window: ResMut<Window>,
 ) {
     for event in events.read() {
         match event.0 {
-            WindowEvent::Resized(window_size) => {
-                ns_window.facade.resize(window_size.into());
+            WindowEvent::FramebufferSize(x, y) => {
+                unsafe { gl::Viewport(0, 0, x, y) };
             }
-            WindowEvent::KeyboardInput {
-                device_id: _,
-                ref event,
-                is_synthetic: _,
-            } => {
-                if let PhysicalKey::Code(code) = event.physical_key {
-                    match event.state {
-                        ElementState::Pressed => {
-                            keyboard.just_pressesd.insert(code);
-                            keyboard.pressed.insert(code);
-                        }
-                        ElementState::Released => {
-                            keyboard.just_released.insert(code);
-                            keyboard.pressed.remove(&code);
-                        }
-                    }
+            WindowEvent::Key(key, _scancode, action, _modifiers) => match action {
+                Action::Press => {
+                    keyboard.just_pressesd.insert(key);
+                    keyboard.pressed.insert(key);
                 }
-            }
-            WindowEvent::MouseInput {
-                device_id: _,
-                state,
-                button,
-            } => match state {
-                ElementState::Pressed => {
+                Action::Release => {
+                    keyboard.just_released.insert(key);
+                    keyboard.pressed.remove(&key);
+                }
+                _ => {}
+            },
+            WindowEvent::MouseButton(button, action, _modifiers) => match action {
+                Action::Press => {
                     mouse.just_pressesd.insert(button);
                     mouse.pressed.insert(button);
                 }
-                ElementState::Released => {
+                Action::Release => {
                     mouse.just_released.insert(button);
                     mouse.pressed.remove(&button);
                 }
+                _ => {}
             },
+            WindowEvent::CursorPos(x, y) => {
+                if window.cursor_grab {
+                    mouse.motion.x += x as f32 - mouse.position.x;
+                    mouse.motion.y += y as f32 - mouse.position.y;
+                    mouse.position.x = x as f32;
+                    mouse.position.y = y as f32;
+                }
+            }
+            WindowEvent::Scroll(x, y) => {
+                if window.cursor_grab {
+                    mouse.scroll.x += x as f32;
+                    mouse.scroll.y += y as f32;
+                }
+            }
             _ => {}
         }
     }
@@ -77,7 +77,7 @@ pub fn handle_input_cleanup(mut keyboard: ResMut<KeyboardInput>, mut mouse: ResM
 }
 
 pub fn handle_window(
-    ns_window: NonSendMut<NSWindow>,
+    mut ns_window: NonSendMut<NSWindow>,
     mut window: ResMut<Window>,
     mut not_first_run: Local<bool>,
 ) {
@@ -87,22 +87,16 @@ pub fn handle_window(
         *not_first_run = true;
         return;
     }
-    match window.cursor_grab {
-        CursorGrabMode::None => {
-            ns_window
-                .winit
-                .set_cursor_grab(CursorGrabMode::None)
-                .unwrap();
-        }
-        _ => ns_window
-            .winit
-            .set_cursor_grab(CursorGrabMode::Locked)
-            .or_else(|_| ns_window.winit.set_cursor_grab(CursorGrabMode::Confined))
-            .unwrap(),
+    // idk
+    if window.cursor_grab {
+        ns_window.window.set_cursor_mode(glfw::CursorMode::Disabled);
+    } else if window.cursor_visible {
+        ns_window.window.set_cursor_mode(glfw::CursorMode::Normal);
+    } else {
+        ns_window.window.set_cursor_mode(glfw::CursorMode::Hidden);
     }
 
-    ns_window.winit.set_cursor_visible(window.cursor_visible);
-
-    window.height = ns_window.winit.inner_size().height;
-    window.width = ns_window.winit.inner_size().width;
+    let (width, height) = ns_window.window.get_size();
+    window.width = width;
+    window.height = height;
 }
