@@ -2,10 +2,15 @@ use std::time::{Duration, Instant};
 
 use bevy_ecs::system::ScheduleSystem;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
+use gl::types::*;
 use glam::*;
 use glfw::Context;
 
-use crate::{ecs::*, window::WindowEventECS};
+use crate::{
+    ecs::*,
+    render::material::{Material, MaterialOptions},
+    window::WindowEventECS,
+};
 
 const CHUNK_SIZE: i32 = 32;
 const SEA_LEVEL: i32 = 64;
@@ -61,12 +66,13 @@ fn main() {
     glfw.window_hint(glfw::WindowHint::OpenGlProfile(
         glfw::OpenGlProfileHint::Core,
     ));
+    glfw.window_hint(glfw::WindowHint::Samples(Some(4)));
 
     #[cfg(target_os = "macos")]
     glfw.window_hint(glfw::WindowHint::OpenGlForwardCompat(true));
 
     let (mut window, events) = glfw
-        .create_window(800, 600, "FerrisCraft GL", glfw::WindowMode::Windowed)
+        .create_window(1280, 720, "FerrisCraft GL", glfw::WindowMode::Windowed)
         .expect("Failed to create GLFW window");
 
     window.make_current();
@@ -122,6 +128,11 @@ fn main() {
 
     app.world.run_schedule(Startup);
 
+    load_skybox(&mut app.world);
+    app.world
+        .non_send_resource_mut::<Materials>()
+        .add(Material::new("skybox", MaterialOptions::default()).unwrap());
+
     while !app
         .world
         .non_send_resource::<NSWindow>()
@@ -153,4 +164,63 @@ fn main() {
             app.world.send_event(WindowEventECS(event));
         }
     }
+}
+
+fn load_skybox(world: &mut World) {
+    let mut texture_id: GLuint = 0;
+
+    unsafe {
+        gl::GenTextures(1, &mut texture_id);
+        gl::BindTexture(gl::TEXTURE_CUBE_MAP, texture_id);
+
+        for (i, &face) in ["face0", "face1", "face2", "face3", "face4", "face5"]
+            .iter()
+            .enumerate()
+        {
+            let img = image::open(format!("assets/skybox/{}.png", face)).unwrap();
+            let width = img.width() as GLint;
+            let height = img.height() as GLint;
+            let raw_data = &img.to_rgb8().into_raw();
+
+            gl::TexImage2D(
+                gl::TEXTURE_CUBE_MAP_POSITIVE_X + i as GLuint,
+                0,
+                gl::RGB as GLint,
+                width,
+                height,
+                0,
+                gl::RGB,
+                gl::UNSIGNED_BYTE,
+                raw_data.as_ptr() as *const _,
+            );
+        }
+
+        gl::TexParameteri(
+            gl::TEXTURE_CUBE_MAP,
+            gl::TEXTURE_MIN_FILTER,
+            gl::LINEAR as GLint,
+        );
+        gl::TexParameteri(
+            gl::TEXTURE_CUBE_MAP,
+            gl::TEXTURE_MAG_FILTER,
+            gl::LINEAR as GLint,
+        );
+        gl::TexParameteri(
+            gl::TEXTURE_CUBE_MAP,
+            gl::TEXTURE_WRAP_S,
+            gl::CLAMP_TO_EDGE as GLint,
+        );
+        gl::TexParameteri(
+            gl::TEXTURE_CUBE_MAP,
+            gl::TEXTURE_WRAP_T,
+            gl::CLAMP_TO_EDGE as GLint,
+        );
+        gl::TexParameteri(
+            gl::TEXTURE_CUBE_MAP,
+            gl::TEXTURE_WRAP_R,
+            gl::CLAMP_TO_EDGE as GLint,
+        );
+    }
+
+    world.insert_resource(Skybox(texture_id as u32));
 }

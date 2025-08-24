@@ -23,7 +23,6 @@ pub fn setup(
     mut commands: Commands,
     mut materials: NonSendMut<Materials>,
     mut window: ResMut<Window>,
-    ns_window: NonSend<NSWindow>,
     noises: Res<NoiseFunctions>,
 ) {
     set_cursor_grab(&mut window, true);

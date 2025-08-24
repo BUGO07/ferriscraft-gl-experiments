@@ -9,10 +9,7 @@ pub use glam::*;
 
 use glfw::{Glfw, Key, MouseButton, PWindow};
 
-use crate::{
-    render::{material::Material, mesh::Mesh},
-    world::mesher::ChunkMesh,
-};
+use crate::{render::material::Material, world::mesher::ChunkMesh};
 
 pub struct NSWindow {
     pub window: PWindow,
@@ -115,6 +112,9 @@ impl Materials {
         MeshMaterial(self.0.len() - 1)
     }
 }
+
+#[derive(Resource)]
+pub struct Skybox(pub u32);
 
 #[derive(Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Mesh3d(pub usize);

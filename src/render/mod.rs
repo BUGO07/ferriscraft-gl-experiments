@@ -1,3 +1,4 @@
+use gl::types::*;
 use glfw::{Context, Key};
 
 use crate::{
@@ -34,6 +35,7 @@ fn render_update(
     keyboard: Res<KeyboardInput>,
     time: Res<Time>,
     // mut egui: NonSendMut<EguiGlium>,
+    skybox_texture: Res<Skybox>,
     mut last_frames: Local<(u32, f32)>, // frame amount accumulated, last_time
     mut disable_ao: Local<bool>,
 ) {
@@ -46,9 +48,9 @@ fn render_update(
         last_frames.0 = 0;
     }
     unsafe {
+        gl::Enable(gl::MULTISAMPLE);
         gl::Enable(gl::DEPTH_TEST);
         gl::ClearColor(0.44, 0.73, 0.88, 1.0);
-        gl::ClearDepthf(1.0);
         gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         gl::Enable(gl::CULL_FACE);
         gl::CullFace(gl::BACK);
@@ -63,7 +65,7 @@ fn render_update(
         *disable_ao = !*disable_ao;
     }
 
-    // chunks
+    // main pass
     {
         let (camera_transform, camera) = camera_query.into_inner();
         let (light_transform, light) = light_query.into_inner();
@@ -76,6 +78,60 @@ fn render_update(
         );
 
         let view = camera_transform.as_mat4().inverse();
+
+        // cubemap
+        unsafe {
+            let mut skybox_vao = 0;
+            let mut skybox_vbo = 0;
+
+            // maybe do this only once
+            {
+                gl::GenVertexArrays(1, &mut skybox_vao);
+                gl::GenBuffers(1, &mut skybox_vbo);
+
+                gl::BindVertexArray(skybox_vao);
+                gl::BindBuffer(gl::ARRAY_BUFFER, skybox_vbo);
+                gl::BufferData(
+                    gl::ARRAY_BUFFER,
+                    size_of_val(SKYBOX_VERTICES) as isize,
+                    SKYBOX_VERTICES.as_ptr() as *const _,
+                    gl::STATIC_DRAW,
+                );
+
+                gl::EnableVertexAttribArray(0);
+                gl::VertexAttribPointer(
+                    0,
+                    3,
+                    gl::FLOAT,
+                    gl::FALSE,
+                    3 * size_of::<GLfloat>() as GLint,
+                    std::ptr::null(),
+                );
+            }
+
+            // drawing
+            {
+                gl::DepthMask(gl::FALSE);
+                gl::DepthFunc(gl::LEQUAL);
+
+                let material = &materials.0[2];
+                material.bind();
+                material.set_uniform(
+                    "view",
+                    UniformValue::Mat4(Mat4::from_quat(camera_transform.rotation).inverse()),
+                );
+                material.set_uniform("perspective", UniformValue::Mat4(perspective));
+
+                gl::BindVertexArray(skybox_vao);
+                gl::BindTexture(gl::TEXTURE_CUBE_MAP, skybox_texture.0);
+                gl::DrawArrays(gl::TRIANGLES, 0, 36);
+                gl::BindVertexArray(0);
+
+                gl::DepthMask(gl::TRUE);
+                gl::DepthFunc(gl::LESS);
+            }
+        }
+
         let vp = perspective * view;
         let frustum = {
             let row1 = vp.row(0);
@@ -168,3 +224,48 @@ fn render_update(
     // egui.paint(&ns_window.context, &mut target);
     // target.finish().unwrap();
 }
+
+#[rustfmt::skip]
+pub const SKYBOX_VERTICES: &[f32] = &[
+    -1.0,  1.0, -1.0,
+    -1.0, -1.0, -1.0,
+     1.0, -1.0, -1.0,
+     1.0, -1.0, -1.0,
+     1.0,  1.0, -1.0,
+    -1.0,  1.0, -1.0,
+
+    -1.0, -1.0,  1.0,
+    -1.0, -1.0, -1.0,
+    -1.0,  1.0, -1.0,
+    -1.0,  1.0, -1.0,
+    -1.0,  1.0,  1.0,
+    -1.0, -1.0,  1.0,
+
+     1.0, -1.0, -1.0,
+     1.0, -1.0,  1.0,
+     1.0,  1.0,  1.0,
+     1.0,  1.0,  1.0,
+     1.0,  1.0, -1.0,
+     1.0, -1.0, -1.0,
+
+    -1.0, -1.0,  1.0,
+    -1.0,  1.0,  1.0,
+     1.0,  1.0,  1.0,
+     1.0,  1.0,  1.0,
+     1.0, -1.0,  1.0,
+    -1.0, -1.0,  1.0,
+
+    -1.0,  1.0, -1.0,
+     1.0,  1.0, -1.0,
+     1.0,  1.0,  1.0,
+     1.0,  1.0,  1.0,
+    -1.0,  1.0,  1.0,
+    -1.0,  1.0, -1.0,
+
+    -1.0, -1.0, -1.0,
+    -1.0, -1.0,  1.0,
+     1.0, -1.0, -1.0,
+     1.0, -1.0, -1.0,
+    -1.0, -1.0,  1.0,
+     1.0, -1.0,  1.0
+];

@@ -1,23 +1,14 @@
 use crate::{
     App,
     ecs::*,
-    render::{
-        material::{Material, MaterialOptions},
-        mesh::Mesh,
-    },
-    utils::Quad,
+    render::material::{Material, MaterialOptions},
 };
 
 pub fn ui_plugin(app: &mut App) {
     app.add_systems(Startup, setup.after(crate::player::setup));
 }
 
-fn setup(
-    mut commands: Commands,
-    mut materials: NonSendMut<Materials>,
-    mut meshes: NonSendMut<Meshes>,
-    ns_window: NonSend<NSWindow>,
-) {
+fn setup(mut commands: Commands, mut materials: NonSendMut<Materials>) {
     let material = materials.add(Material::new("ui", MaterialOptions::default()).unwrap());
 
     commands.spawn(UIRect::new(
