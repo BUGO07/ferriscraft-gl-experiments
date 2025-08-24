@@ -236,7 +236,6 @@ pub fn process_tasks(
     mesh_tasks: Query<(Entity, &mut ComputeChunkMesh)>,
     spawn_tasks: Query<(Entity, &mut ComputeChunk)>,
     world_data: Res<WorldData>,
-    ns_window: NonSend<NSWindow>,
 ) {
     // GENERATING CHUNKS
     let pt = player.translation.as_ivec3().with_y(0) / CHUNK_SIZE;

@@ -12,7 +12,6 @@ use fastnoise2::{
 use crate::{
     App,
     ecs::*,
-    render::mesh::Mesh,
     world::mesher::{Chunk, ChunkMesh},
 };
 

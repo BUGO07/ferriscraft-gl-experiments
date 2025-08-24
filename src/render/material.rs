@@ -64,12 +64,15 @@ impl Material {
             .map_err(|_| format!("could not read {shader} fragment shader"))?;
 
         unsafe {
+            println!("compiling {shader} vertex shader");
             let vertex_shader = compile_shader(&vert_src, gl::VERTEX_SHADER)?;
+            println!("compiling {shader} fragment shader");
             let fragment_shader = compile_shader(&frag_src, gl::FRAGMENT_SHADER)?;
 
             let program = gl::CreateProgram();
             gl::AttachShader(program, vertex_shader);
             gl::AttachShader(program, fragment_shader);
+            println!("linking {shader} shader program");
             gl::LinkProgram(program);
 
             let mut success = gl::FALSE as GLint;
@@ -77,7 +80,9 @@ impl Material {
             if success != gl::TRUE as GLint {
                 let mut info_log = vec![0; 512];
                 gl::GetProgramInfoLog(program, 512, null_mut(), info_log.as_mut_ptr() as *mut _);
-                return Err(String::from_utf8_lossy(&info_log).into_owned());
+                return Err(String::from_utf8_lossy(&info_log)
+                    .trim_end_matches(0 as char)
+                    .to_string());
             }
 
             gl::DeleteShader(vertex_shader);
@@ -161,7 +166,9 @@ fn compile_shader(source: &str, shader_type: GLuint) -> Result<GLuint, String> {
         if success != gl::TRUE as GLint {
             let mut info_log = vec![0; 512];
             gl::GetShaderInfoLog(shader, 512, null_mut(), info_log.as_mut_ptr() as *mut _);
-            return Err(String::from_utf8_lossy(&info_log).into_owned());
+            return Err(String::from_utf8_lossy(&info_log)
+                .trim_end_matches(0 as char)
+                .to_string());
         }
         Ok(shader)
     }
