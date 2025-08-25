@@ -14,7 +14,7 @@ fn setup(mut commands: Commands, mut materials: NonSendMut<Materials>) {
             "ui",
             MaterialOptions {
                 base_texture: Some("assets/fonts/font.png"),
-                base_color: Some(Vec4::ONE),
+                base_color: Some(Vec4::new(1.0, 0.0, 0.0, 1.0)),
             },
         )
         .unwrap(),
