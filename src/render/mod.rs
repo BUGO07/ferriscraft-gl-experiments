@@ -5,7 +5,7 @@ use crate::{
     App,
     ecs::*,
     render::{material::UniformValue, mesh::Mesh},
-    ui::UIRect,
+    ui::UIText,
     utils::should_cull,
 };
 
@@ -30,7 +30,7 @@ fn render_update(
     >,
     camera_query: Single<(&mut Transform, &Camera3d), (Without<Mesh3d>, Without<DirectionalLight>)>,
     light_query: Single<(&Transform, &DirectionalLight), (Without<Mesh3d>, Without<Camera3d>)>,
-    ui_query: Query<&UIRect>,
+    ui_query: Query<&UIText>,
     debug_info: Option<ResMut<DebugInfo>>,
     keyboard: Res<KeyboardInput>,
     time: Res<Time>,
@@ -117,10 +117,10 @@ fn render_update(
                 let material = &materials.0[2];
                 material.bind();
                 material.set_uniform(
-                    "view",
+                    c"view",
                     UniformValue::Mat4(Mat4::from_quat(camera_transform.rotation).inverse()),
                 );
-                material.set_uniform("perspective", UniformValue::Mat4(perspective));
+                material.set_uniform(c"perspective", UniformValue::Mat4(perspective));
 
                 gl::BindVertexArray(skybox_vao);
                 gl::BindTexture(gl::TEXTURE_CUBE_MAP, skybox_texture.0);
@@ -163,11 +163,11 @@ fn render_update(
             let material = &materials.0[material_id.0];
 
             material.bind();
-            material.set_uniform("perspective", UniformValue::Mat4(perspective));
-            material.set_uniform("view", UniformValue::Mat4(view));
-            material.set_uniform("model", UniformValue::Mat4(chunk_transform.as_mat4()));
+            material.set_uniform(c"perspective", UniformValue::Mat4(perspective));
+            material.set_uniform(c"view", UniformValue::Mat4(view));
+            material.set_uniform(c"model", UniformValue::Mat4(chunk_transform.as_mat4()));
             material.set_uniform(
-                "u_light",
+                c"u_light",
                 UniformValue::Vec4(
                     (view * Mat4::from_quat(light_transform.rotation) * Vec4::NEG_Z)
                         .truncate()
@@ -175,7 +175,7 @@ fn render_update(
                         .extend(light.illuminance),
                 ),
             );
-            material.set_uniform("disable_ao", UniformValue::Bool(*disable_ao));
+            material.set_uniform(c"disable_ao", UniformValue::Bool(*disable_ao));
             mesh.draw();
 
             indices += mesh.index_count;
@@ -190,29 +190,46 @@ fn render_update(
     {
         let window_size = vec2(width as f32, height as f32);
 
-        for ui_item in ui_query.iter() {
-            let Ok(mesh) = Mesh::new(&[0, 0, 0, 0], &[0, 1, 2, 0, 2, 3]) else {
-                continue;
-            };
-            // 1x1 quad
-            let material = &materials.0[ui_item.material.0];
+        unsafe {
+            gl::Disable(gl::DEPTH_TEST);
+            gl::Disable(gl::CULL_FACE);
+            gl::Enable(gl::BLEND);
+            gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA)
+        }
+        const CHARACTERS: &str = "!\"#$%'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\] _`abcdefghijklmnopqrstuvwxyz     ";
 
-            let pos = Vec2::new(
-                ui_item.x.calculate(window_size.x) - 1.0,
-                1.0 - ui_item.y.calculate(window_size.y),
-            );
-            let size = Vec2::new(
-                ui_item.width.calculate(window_size.x),
-                -ui_item.height.calculate(window_size.y),
-            );
+        for ui_text in ui_query.iter() {
+            let material = &materials.0[ui_text.material.0];
+            let char_width = ui_text.width.calculate(window_size.x);
+            let char_height = ui_text.height.calculate(window_size.y);
+            let base_x = ui_text.x.calculate(window_size.x);
+            let base_y = ui_text.y.calculate(window_size.y);
 
-            material.bind();
-            material.set_uniform("pos", UniformValue::Vec2(pos));
-            material.set_uniform("size", UniformValue::Vec2(size));
-            mesh.draw();
+            for (char_index, character) in ui_text.text.chars().enumerate() {
+                if let Some(i) = CHARACTERS.find(character) {
+                    let glyph_index = i as u32;
 
-            indices += mesh.index_count;
-            draw_calls += 1;
+                    let verts = [glyph_index, glyph_index, glyph_index, glyph_index];
+                    let inds = [0u32, 1, 2, 0, 2, 3];
+
+                    let Ok(mesh) = Mesh::new(&verts, &inds) else {
+                        continue;
+                    };
+
+                    let pos =
+                        Vec2::new(base_x + char_index as f32 * char_width - 1.0, 1.0 - base_y);
+
+                    let size = Vec2::new(char_width, -char_height);
+
+                    material.bind();
+                    material.set_uniform(c"u_pos", UniformValue::Vec2(pos));
+                    material.set_uniform(c"u_size", UniformValue::Vec2(size));
+                    mesh.draw();
+
+                    indices += mesh.index_count;
+                    draw_calls += 1;
+                }
+            }
         }
     }
 

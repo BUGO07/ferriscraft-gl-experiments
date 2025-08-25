@@ -48,18 +48,14 @@ pub fn handle_events(
                 _ => {}
             },
             WindowEvent::CursorPos(x, y) => {
-                if window.cursor_grab {
-                    mouse.motion.x += x as f32 - mouse.position.x;
-                    mouse.motion.y += y as f32 - mouse.position.y;
-                    mouse.position.x = x as f32;
-                    mouse.position.y = y as f32;
-                }
+                mouse.motion.x += x as f32 - mouse.position.x;
+                mouse.motion.y += y as f32 - mouse.position.y;
+                mouse.position.x = x as f32;
+                mouse.position.y = y as f32;
             }
             WindowEvent::Scroll(x, y) => {
-                if window.cursor_grab {
-                    mouse.scroll.x += x as f32;
-                    mouse.scroll.y += y as f32;
-                }
+                mouse.scroll.x += x as f32;
+                mouse.scroll.y += y as f32;
             }
             _ => {}
         }

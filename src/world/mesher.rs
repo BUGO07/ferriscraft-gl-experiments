@@ -80,9 +80,9 @@ impl ChunkMesh {
     ) -> Option<Self> {
         let chunk_pos = chunk.pos;
 
-        let left_chunk = chunks.get(&(chunk_pos + IVec3::new(-1, 0, 0)));
-        let back_chunk = chunks.get(&(chunk_pos + IVec3::new(0, 0, -1)));
-        let down_chunk = chunks.get(&(chunk_pos + IVec3::new(0, -1, 0)));
+        let back_chunk = chunks.get(&(chunk_pos - IVec3::Z));
+        let left_chunk = chunks.get(&(chunk_pos - IVec3::X));
+        let down_chunk = chunks.get(&(chunk_pos - IVec3::Y));
 
         // parallelized (thanks rayon)
         let mesh_parts = (0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
@@ -129,7 +129,6 @@ impl ChunkMesh {
             .collect::<Vec<_>>();
 
         let mut vertices = Vec::new();
-        let mut indices = Vec::new();
         for part in mesh_parts {
             vertices.extend(part.vertices);
         }
@@ -138,12 +137,17 @@ impl ChunkMesh {
             None
         } else {
             vertices.shrink_to_fit();
-            indices.extend((0..vertices.len()).step_by(4).flat_map(|i| {
-                let idx = i as u32;
-                [idx, idx + 1, idx + 2, idx, idx + 2, idx + 3]
-            }));
 
-            Some(Self { vertices, indices })
+            Some(Self {
+                indices: (0..vertices.len())
+                    .step_by(4)
+                    .flat_map(|i| {
+                        let idx = i as u32;
+                        [idx, idx + 1, idx + 2, idx, idx + 2, idx + 3]
+                    })
+                    .collect::<Vec<_>>(),
+                vertices,
+            })
         }
     }
 

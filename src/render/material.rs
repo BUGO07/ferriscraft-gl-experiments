@@ -1,7 +1,7 @@
 use gl::types::*;
 use glam::*;
 use std::{
-    ffi::CString,
+    ffi::{CStr, CString},
     ptr::{null, null_mut},
 };
 
@@ -50,10 +50,10 @@ impl Material {
             if let Some(texture) = self.texture {
                 gl::ActiveTexture(gl::TEXTURE0);
                 gl::BindTexture(gl::TEXTURE_2D, texture);
-                self.set_uniform("tex", UniformValue::Int(0));
+                self.set_uniform(c"tex", UniformValue::Int(0));
             }
 
-            self.set_uniform("base_color", UniformValue::Vec4(self.base_color));
+            self.set_uniform(c"base_color", UniformValue::Vec4(self.base_color));
         }
     }
 
@@ -131,10 +131,9 @@ impl Material {
         Ok(texture)
     }
 
-    pub fn set_uniform(&self, name: &str, value: UniformValue) {
+    pub fn set_uniform(&self, name: &CStr, value: UniformValue) {
         unsafe {
-            let location =
-                gl::GetUniformLocation(self.program, CString::new(name).unwrap().as_ptr());
+            let location = gl::GetUniformLocation(self.program, name.as_ptr());
 
             match value {
                 UniformValue::Bool(b) => gl::Uniform1i(location, b as GLint),

@@ -9,23 +9,33 @@ pub fn ui_plugin(app: &mut App) {
 }
 
 fn setup(mut commands: Commands, mut materials: NonSendMut<Materials>) {
-    let material = materials.add(Material::new("ui", MaterialOptions::default()).unwrap());
+    let material = materials.add(
+        Material::new(
+            "ui",
+            MaterialOptions {
+                base_texture: Some("assets/fonts/font.png"),
+                base_color: Some(Vec4::ONE),
+            },
+        )
+        .unwrap(),
+    );
 
-    commands.spawn(UIRect::new(
+    commands.spawn(UIText::new(
         Val::Percent(0.0),
         Val::Percent(0.0),
-        Val::Px(80.0),
-        Val::Px(80.0),
+        Val::Px(8.0 * 1.5),
+        Val::Px(16.0 * 1.5),
         material,
+        "PEAK GAME".to_string(),
     ));
 
-    commands.spawn(UIRect::new(
-        Val::Percent(50.0),
-        Val::Percent(50.0),
-        Val::Percent(1.0),
-        Val::Percent(1.0),
-        material,
-    ));
+    // commands.spawn(UIRect::new(
+    //     Val::Percent(50.0),
+    //     Val::Percent(50.0),
+    //     Val::Percent(1.0),
+    //     Val::Percent(1.0),
+    //     material,
+    // ));
 }
 
 pub enum Val {
@@ -65,6 +75,36 @@ impl UIRect {
             width,
             height,
             material,
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct UIText {
+    pub x: Val,
+    pub y: Val,
+    pub width: Val,
+    pub height: Val,
+    pub material: MeshMaterial,
+    pub text: String,
+}
+
+impl UIText {
+    pub fn new(
+        x: Val,
+        y: Val,
+        width: Val,
+        height: Val,
+        material: MeshMaterial,
+        text: String,
+    ) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+            material,
+            text,
         }
     }
 }
