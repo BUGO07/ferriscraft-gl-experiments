@@ -14,6 +14,10 @@ pub fn handle_movement(
         set_cursor_grab(&mut window, grab);
     }
 
+    if !window.cursor_grab {
+        return;
+    }
+
     let mut move_dir = Vec3::ZERO;
 
     let local_z = camera.rotation * Vec3::Z;
