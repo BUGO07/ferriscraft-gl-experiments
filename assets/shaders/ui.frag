@@ -13,6 +13,6 @@ void main() {
     if (sampled == vec4(0.0,0.0,0.0,1.0)) {
         color = vec4(0.0,0.0,0.0,0.0);
     } else {
-        color = sampled;
+        color = sampled * base_color;
     }
 }
