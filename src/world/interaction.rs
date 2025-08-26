@@ -36,6 +36,12 @@ pub fn place_block(
         if pos.x == CHUNK_SIZE - 1 {
             positions.push(chunk.pos + IVec3::X);
         }
+        if pos.y == 0 {
+            positions.push(chunk.pos - IVec3::Y);
+        }
+        if pos.y == CHUNK_SIZE - 1 {
+            positions.push(chunk.pos + IVec3::Y);
+        }
         if pos.z == 0 {
             positions.push(chunk.pos - IVec3::Z);
         }

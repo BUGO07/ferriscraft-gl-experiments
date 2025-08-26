@@ -69,7 +69,7 @@ fn handle_interactions(
     if let Some(hit) = ray_cast(
         &world_data,
         player.translation,
-        player.rotation * Vec3::NEG_Z,
+        player.rotation * Vec3::NEG_Z, // == player.forward()
         5.0,
     ) {
         let mut local_pos = hit.local_pos;
