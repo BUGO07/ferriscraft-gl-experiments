@@ -18,7 +18,6 @@ pub fn handle_events(
     mut events: EventReader<WindowEventECS>,
     mut keyboard: ResMut<KeyboardInput>,
     mut mouse: ResMut<MouseInput>,
-    window: ResMut<Window>,
 ) {
     for event in events.read() {
         match event.0 {
@@ -27,7 +26,7 @@ pub fn handle_events(
             }
             WindowEvent::Key(key, _scancode, action, _modifiers) => match action {
                 Action::Press => {
-                    keyboard.just_pressesd.insert(key);
+                    keyboard.just_pressed.insert(key);
                     keyboard.pressed.insert(key);
                 }
                 Action::Release => {
@@ -38,7 +37,7 @@ pub fn handle_events(
             },
             WindowEvent::MouseButton(button, action, _modifiers) => match action {
                 Action::Press => {
-                    mouse.just_pressesd.insert(button);
+                    mouse.just_pressed.insert(button);
                     mouse.pressed.insert(button);
                 }
                 Action::Release => {
@@ -63,10 +62,10 @@ pub fn handle_events(
 }
 
 pub fn handle_input_cleanup(mut keyboard: ResMut<KeyboardInput>, mut mouse: ResMut<MouseInput>) {
-    keyboard.just_pressesd.clear();
+    keyboard.just_pressed.clear();
     keyboard.just_released.clear();
 
-    mouse.just_pressesd.clear();
+    mouse.just_pressed.clear();
     mouse.just_released.clear();
     mouse.motion = Vec2::ZERO;
     mouse.scroll = Vec2::ZERO;
