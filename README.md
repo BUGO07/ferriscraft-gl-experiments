@@ -29,3 +29,6 @@
 2. `cd ferriscraft-gl-experiments`
 3. `cargo run` - builds and runs the project.
 4. (Optional) `cargo run --release` for maximum performance. (longer compile times)
+
+## Credits
+[Font](https://frostyfreeze.itch.io/pixel-bitmap-fonts-png-xml) - [CC0](https://choosealicense.com/licenses/cc0-1.0/)

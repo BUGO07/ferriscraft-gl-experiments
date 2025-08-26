@@ -48,7 +48,7 @@ impl Time {
 
 #[derive(Resource, Debug, Default)]
 pub struct MouseInput {
-    pub just_pressesd: HashSet<MouseButton>,
+    pub just_pressed: HashSet<MouseButton>,
     pub just_released: HashSet<MouseButton>,
     pub pressed: HashSet<MouseButton>,
     pub position: Vec2,
@@ -58,7 +58,7 @@ pub struct MouseInput {
 
 impl MouseInput {
     pub fn just_pressed(&self, key: MouseButton) -> bool {
-        self.just_pressesd.contains(&key)
+        self.just_pressed.contains(&key)
     }
 
     pub fn just_released(&self, key: MouseButton) -> bool {
@@ -72,14 +72,14 @@ impl MouseInput {
 
 #[derive(Resource, Debug, Default)]
 pub struct KeyboardInput {
-    pub just_pressesd: HashSet<Key>,
+    pub just_pressed: HashSet<Key>,
     pub just_released: HashSet<Key>,
     pub pressed: HashSet<Key>,
 }
 
 impl KeyboardInput {
     pub fn just_pressed(&self, key: Key) -> bool {
-        self.just_pressesd.contains(&key)
+        self.just_pressed.contains(&key)
     }
 
     pub fn just_released(&self, key: Key) -> bool {

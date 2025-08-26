@@ -4,29 +4,38 @@ use crate::{
     render::material::{Material, MaterialOptions},
 };
 
+pub mod update;
+
 pub fn ui_plugin(app: &mut App) {
-    app.add_systems(Startup, setup.after(crate::player::setup));
+    app.add_systems(Startup, setup.after(crate::player::setup))
+        .add_systems(Update, update::update_ui);
 }
+
+#[derive(Component)]
+pub struct CoordsText;
 
 fn setup(mut commands: Commands, mut materials: NonSendMut<Materials>) {
     let material = materials.add(
         Material::new(
-            "ui",
+            "text",
             MaterialOptions {
-                base_texture: Some("assets/fonts/font.png"),
+                base_texture: Some("assets/fonts/minogram_6x10.png"),
                 base_color: Some(Vec4::new(1.0, 0.0, 0.0, 1.0)),
             },
         )
         .unwrap(),
     );
 
-    commands.spawn(UIText::new(
-        Val::Percent(0.0),
-        Val::Percent(0.0),
-        Val::Px(8.0 * 1.5),
-        Val::Px(16.0 * 1.5),
-        material,
-        "PEAK GAME".to_string(),
+    commands.spawn((
+        UIText::new(
+            Val::Percent(0.0),
+            Val::Percent(0.0),
+            Val::Px(6.0 * 3.0),
+            Val::Px(10.0 * 3.0),
+            material,
+            "f3 or something".to_string(),
+        ),
+        CoordsText,
     ));
 
     // commands.spawn(UIRect::new(
@@ -83,28 +92,28 @@ impl UIRect {
 pub struct UIText {
     pub x: Val,
     pub y: Val,
-    pub width: Val,
-    pub height: Val,
-    pub material: MeshMaterial,
+    pub font_size: Val,
+    pub font_height: Val,
     pub text: String,
+    pub material: MeshMaterial,
 }
 
 impl UIText {
     pub fn new(
         x: Val,
         y: Val,
-        width: Val,
-        height: Val,
+        font_size: Val,
+        font_height: Val,
         material: MeshMaterial,
         text: String,
     ) -> Self {
         Self {
             x,
             y,
-            width,
-            height,
-            material,
+            font_size,
+            font_height,
             text,
+            material,
         }
     }
 }

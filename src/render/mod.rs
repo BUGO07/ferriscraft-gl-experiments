@@ -188,6 +188,8 @@ fn render_update(
 
     // ui
     {
+        const CHARACTERS: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-=()[]{}<>/*:#%!?.,'\"@&$";
+
         let window_size = vec2(width as f32, height as f32);
 
         unsafe {
@@ -196,39 +198,40 @@ fn render_update(
             gl::Enable(gl::BLEND);
             gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA)
         }
-        const CHARACTERS: &str = "!\"#$%'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\] _`abcdefghijklmnopqrstuvwxyz     ";
 
         for ui_text in ui_query.iter() {
             let material = &materials.0[ui_text.material.0];
-            let char_width = ui_text.width.calculate(window_size.x);
-            let char_height = ui_text.height.calculate(window_size.y);
+            let char_width = ui_text.font_size.calculate(window_size.x);
+            let char_height = ui_text.font_height.calculate(window_size.y);
             let base_x = ui_text.x.calculate(window_size.x);
-            let base_y = ui_text.y.calculate(window_size.y);
+            let mut base_y = ui_text.y.calculate(window_size.y);
 
-            for (char_index, character) in ui_text.text.chars().enumerate() {
-                if let Some(i) = CHARACTERS.find(character) {
-                    let glyph_index = i as u32;
+            for txt in ui_text.text.split('\n') {
+                for (char_index, character) in txt.chars().enumerate() {
+                    if let Some(i) = CHARACTERS.find(character) {
+                        let i = i as u32;
+                        let verts = [i, i, i, i];
+                        let inds = [0u32, 1, 2, 0, 2, 3];
 
-                    let verts = [glyph_index, glyph_index, glyph_index, glyph_index];
-                    let inds = [0u32, 1, 2, 0, 2, 3];
+                        let Ok(mesh) = Mesh::new(&verts, &inds) else {
+                            continue;
+                        };
 
-                    let Ok(mesh) = Mesh::new(&verts, &inds) else {
-                        continue;
-                    };
+                        let pos =
+                            Vec2::new(base_x + char_index as f32 * char_width - 1.0, 1.0 - base_y);
 
-                    let pos =
-                        Vec2::new(base_x + char_index as f32 * char_width - 1.0, 1.0 - base_y);
+                        let size = Vec2::new(char_width, -char_height);
 
-                    let size = Vec2::new(char_width, -char_height);
+                        material.bind();
+                        material.set_uniform(c"u_pos", UniformValue::Vec2(pos));
+                        material.set_uniform(c"u_size", UniformValue::Vec2(size));
+                        mesh.draw();
 
-                    material.bind();
-                    material.set_uniform(c"u_pos", UniformValue::Vec2(pos));
-                    material.set_uniform(c"u_size", UniformValue::Vec2(size));
-                    mesh.draw();
-
-                    indices += mesh.index_count;
-                    draw_calls += 1;
+                        indices += mesh.index_count;
+                        draw_calls += 1;
+                    }
                 }
+                base_y += char_height;
             }
         }
     }
