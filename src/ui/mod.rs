@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::{
     App,
     ecs::*,
@@ -12,7 +14,7 @@ pub fn ui_plugin(app: &mut App) {
 }
 
 #[derive(Component)]
-pub struct CoordsText;
+pub struct DebugText;
 
 fn setup(mut commands: Commands, mut materials: NonSendMut<Materials>) {
     let material = materials.add(
@@ -35,7 +37,7 @@ fn setup(mut commands: Commands, mut materials: NonSendMut<Materials>) {
             material,
             "f3 or something".to_string(),
         ),
-        CoordsText,
+        DebugText,
     ));
 
     // commands.spawn(UIRect::new(

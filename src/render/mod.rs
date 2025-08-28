@@ -4,7 +4,10 @@ use glfw::{Context, Key};
 use crate::{
     App,
     ecs::*,
-    render::{material::UniformValue, mesh::Mesh},
+    render::{
+        material::UniformValue,
+        mesh::{Mesh, Vertex},
+    },
     ui::UIText,
     utils::should_cull,
 };
@@ -33,20 +36,10 @@ fn render_update(
     ui_query: Query<&UIText>,
     debug_info: Option<ResMut<DebugInfo>>,
     keyboard: Res<KeyboardInput>,
-    time: Res<Time>,
     // mut egui: NonSendMut<EguiGlium>,
     skybox_texture: Res<Skybox>,
-    mut last_frames: Local<(u32, f32)>, // frame amount accumulated, last_time
     mut disable_ao: Local<bool>,
 ) {
-    last_frames.0 += 1;
-    if last_frames.1 + 1.0 < time.elapsed_secs() {
-        ns_window
-            .window
-            .set_title(format!("FerrisCraft GL - FPS: {}", last_frames.0).as_str()); // maybe update ui instead of title
-        last_frames.1 = time.elapsed_secs();
-        last_frames.0 = 0;
-    }
     unsafe {
         gl::Enable(gl::MULTISAMPLE);
         gl::Enable(gl::DEPTH_TEST);
@@ -196,7 +189,7 @@ fn render_update(
             gl::Disable(gl::DEPTH_TEST);
             gl::Disable(gl::CULL_FACE);
             gl::Enable(gl::BLEND);
-            gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA)
+            gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
         }
 
         for ui_text in ui_query.iter() {
@@ -206,32 +199,38 @@ fn render_update(
             let base_x = ui_text.x.calculate(window_size.x);
             let mut base_y = ui_text.y.calculate(window_size.y);
 
-            for txt in ui_text.text.split('\n') {
-                for (char_index, character) in txt.chars().enumerate() {
+            let mut vertices = Vec::new();
+
+            for line in ui_text.text.split('\n') {
+                for (char_index, character) in line.chars().enumerate() {
                     if let Some(i) = CHARACTERS.find(character) {
-                        let i = i as u32;
-                        let verts = [i, i, i, i];
-                        let inds = [0u32, 1, 2, 0, 2, 3];
-
-                        let Ok(mesh) = Mesh::new(&verts, &inds) else {
-                            continue;
+                        let vert = TextVertex {
+                            position: [base_x + char_index as f32 * char_width - 1.0, 1.0 - base_y],
+                            char_id: i as u32,
                         };
-
-                        let pos =
-                            Vec2::new(base_x + char_index as f32 * char_width - 1.0, 1.0 - base_y);
-
-                        let size = Vec2::new(char_width, -char_height);
-
-                        material.bind();
-                        material.set_uniform(c"u_pos", UniformValue::Vec2(pos));
-                        material.set_uniform(c"u_size", UniformValue::Vec2(size));
-                        mesh.draw();
-
-                        indices += mesh.index_count;
-                        draw_calls += 1;
+                        vertices.extend_from_slice(&[vert, vert, vert, vert]);
                     }
                 }
                 base_y += char_height;
+            }
+
+            if let Ok(mesh) = Mesh::new(
+                &vertices,
+                &(0..vertices.len())
+                    .step_by(4)
+                    .flat_map(|i| {
+                        let idx = i as u32;
+                        [idx, idx + 1, idx + 2, idx, idx + 2, idx + 3]
+                    })
+                    .collect::<Vec<_>>(),
+            ) {
+                material.bind();
+                material.set_uniform(
+                    c"u_size",
+                    UniformValue::Vec2(Vec2::new(char_width, -char_height)),
+                );
+
+                mesh.draw();
             }
         }
     }
@@ -243,6 +242,24 @@ fn render_update(
     ns_window.window.swap_buffers();
     // egui.paint(&ns_window.context, &mut target);
     // target.finish().unwrap();
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+struct TextVertex {
+    position: [f32; 2],
+    char_id: u32,
+    // size: [f32; 2],
+}
+
+impl Vertex for TextVertex {
+    fn attributes() -> &'static [(GLuint, GLint, GLenum, GLboolean, usize)] {
+        &[
+            (0, 2, gl::FLOAT, gl::FALSE, 0),
+            (1, 1, gl::UNSIGNED_INT, gl::FALSE, size_of::<[f32; 2]>()),
+            // (2, 2, gl::FLOAT, gl::FALSE, size_of::<[f32; 2]>()),
+        ]
+    }
 }
 
 #[rustfmt::skip]

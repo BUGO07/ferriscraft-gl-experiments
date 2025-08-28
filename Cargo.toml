@@ -10,9 +10,8 @@ opt-level = 3
 opt-level = 1
 
 [dependencies]
-bevy_ecs = "0.16.1"
-bevy_tasks = { version = "0.16.1", features = ["multi_threaded"] }
-egui_gl_glfw = "0.1.13"
+bevy_ecs = { version = "0.16.1", features = ["multi_threaded"] }
+bevy_tasks = "*"
 fastnoise2 = "0.3.1"
 gl = "0.14.0"
 glam = "0.30.5"
