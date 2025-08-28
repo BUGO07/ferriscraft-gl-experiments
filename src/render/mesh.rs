@@ -1,16 +1,21 @@
-use std::ptr::null;
+use std::{marker::PhantomData, ptr::null};
 
 use gl::types::*;
 
-pub struct Mesh {
+pub trait Vertex {
+    fn attributes() -> &'static [(GLuint, GLint, GLenum, GLboolean, usize)];
+}
+
+pub struct Mesh<V: Vertex> {
     pub vao: GLuint,
     pub vbo: GLuint,
     pub ebo: GLuint,
     pub index_count: GLint,
+    _marker: PhantomData<V>,
 }
 
-impl Mesh {
-    pub fn new(vertices: &[GLuint], indices: &[GLuint]) -> Result<Self, String> {
+impl<V: Vertex> Mesh<V> {
+    pub fn new(vertices: &[V], indices: &[u32]) -> Result<Self, String> {
         let (mut vao, mut vbo, mut ebo) = (0, 0, 0);
         unsafe {
             gl::GenVertexArrays(1, &mut vao);
@@ -22,7 +27,7 @@ impl Mesh {
             gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
             gl::BufferData(
                 gl::ARRAY_BUFFER,
-                vertices.len() as GLsizeiptr * size_of::<GLuint>() as GLsizeiptr,
+                size_of_val(vertices) as isize,
                 vertices.as_ptr() as *const _,
                 gl::STATIC_DRAW,
             );
@@ -30,13 +35,35 @@ impl Mesh {
             gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
             gl::BufferData(
                 gl::ELEMENT_ARRAY_BUFFER,
-                indices.len() as GLsizeiptr * size_of::<GLuint>() as GLsizeiptr,
+                size_of_val(indices) as isize,
                 indices.as_ptr() as *const _,
                 gl::STATIC_DRAW,
             );
 
-            gl::VertexAttribIPointer(0, 1, gl::UNSIGNED_INT, size_of::<GLuint>() as GLint, null());
-            gl::EnableVertexAttribArray(0);
+            for &(location, size, type_, normalized, offset) in V::attributes() {
+                match type_ {
+                    gl::UNSIGNED_INT | gl::INT | gl::UNSIGNED_BYTE | gl::BYTE => {
+                        gl::VertexAttribIPointer(
+                            location,
+                            size,
+                            type_,
+                            size_of::<V>() as GLint,
+                            offset as *const _,
+                        );
+                    }
+                    _ => {
+                        gl::VertexAttribPointer(
+                            location,
+                            size,
+                            type_,
+                            normalized,
+                            size_of::<V>() as GLint,
+                            offset as *const _,
+                        );
+                    }
+                }
+                gl::EnableVertexAttribArray(location);
+            }
 
             gl::BindVertexArray(0);
         }
@@ -46,6 +73,7 @@ impl Mesh {
             vbo,
             ebo,
             index_count: indices.len() as GLint,
+            _marker: PhantomData,
         })
     }
 
@@ -57,7 +85,7 @@ impl Mesh {
     }
 }
 
-impl Drop for Mesh {
+impl<V: Vertex> Drop for Mesh<V> {
     fn drop(&mut self) {
         unsafe {
             gl::DeleteVertexArrays(1, &self.vao);

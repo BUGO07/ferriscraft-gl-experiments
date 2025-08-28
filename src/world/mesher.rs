@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
-use gl::types::GLuint;
+use gl::types::*;
 use glam::*;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
     CHUNK_SIZE, SEA_LEVEL,
+    render::mesh::Vertex,
     utils::{Quad, generate_block_at, index_to_vec3, vec3_to_index},
     world::NoiseFunctions,
 };
@@ -66,9 +67,20 @@ impl Direction {
     }
 }
 
-#[derive(Debug, Default)]
+#[repr(C)]
+pub struct VoxelVertex {
+    vert_data: u32,
+}
+
+impl Vertex for VoxelVertex {
+    fn attributes() -> &'static [(GLuint, GLint, GLenum, GLboolean, usize)] {
+        &[(0, 1, gl::UNSIGNED_INT, gl::FALSE, 0)]
+    }
+}
+
+#[derive(Default)]
 pub struct ChunkMesh {
-    pub vertices: Vec<GLuint>,
+    pub vertices: Vec<VoxelVertex>,
     pub indices: Vec<GLuint>,
 }
 
@@ -176,14 +188,14 @@ impl ChunkMesh {
                 ao_count = 3;
             }
 
-            self.vertices.push(
-                pos[0] as u32
+            self.vertices.push(VoxelVertex {
+                vert_data: pos[0] as u32
                     | (pos[1] as u32) << 6
                     | (pos[2] as u32) << 12
                     | (dir as u32) << 18
                     | (ao_count as u32) << 21
                     | (block as u32) << 23,
-            );
+            });
         }
     }
 }
@@ -259,7 +271,7 @@ impl Chunk {
             chunk_z * CHUNK_SIZE + lz,
         );
         let (max_y, _biome) = terrain_noise(world_pos.xz().as_vec2(), noises);
-        generate_block_at(world_pos, max_y)
+        generate_block_at(world_pos, max_y) // ! shouldn't do this (at least without checking for changes)
     }
 
     #[inline(always)]
