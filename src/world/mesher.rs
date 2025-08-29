@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use gl::types::*;
 use glam::*;
+use noise::NoiseFn;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
@@ -333,8 +334,8 @@ const PLAINS_MOUNTAIN_THRESHOLD: f32 = 0.6;
 #[inline]
 // max_y, biome
 pub fn terrain_noise(pos: Vec2, noises: &NoiseFunctions) -> (i32, f32) {
-    let terrain_fbm = (noises.terrain.gen_single_2d(pos.x, pos.y, noises.seed) + 1.0) / 2.0;
-    let biome_fbm = (noises.biome.gen_single_2d(pos.x, pos.y, noises.seed + 1) + 1.0) / 2.0;
+    let terrain_fbm = (noises.terrain.get(pos.as_dvec2().into()) as f32 + 1.0) / 2.0;
+    let biome_fbm = (noises.biome.get(pos.as_dvec2().into()) as f32 + 1.0) / 2.0;
 
     let min_height: f32;
     let max_height: f32;

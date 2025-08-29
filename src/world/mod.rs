@@ -4,10 +4,7 @@ use std::{
 };
 
 use bevy_tasks::Task;
-use fastnoise2::{
-    SafeNode,
-    generator::{Generator, GeneratorWrapper, simplex::Simplex},
-};
+use noise::{Fbm, MultiFractal, Simplex};
 
 use crate::{
     App,
@@ -20,21 +17,25 @@ pub mod interaction;
 pub mod mesher;
 
 pub fn world_plugin(app: &mut App) {
+    let seed = 1337;
     app.init_resource::<WorldData>()
         .insert_resource(NoiseFunctions {
-            seed: 1337,
-            terrain: GeneratorWrapper(Simplex)
-                .fbm(0.5, 0.0, 4, 2.0)
-                .domain_scale(0.002)
-                .build(),
-            biome: GeneratorWrapper(Simplex)
-                .fbm(0.6, 0.0, 3, 2.0)
-                .domain_scale(0.0001)
-                .build(),
-            detail: GeneratorWrapper(Simplex)
-                .fbm(0.5, 0.3, 3, 1.9)
-                .domain_scale(0.004)
-                .build(),
+            seed,
+            terrain: Fbm::<Simplex>::new(seed)
+                .set_frequency(0.002)
+                .set_persistence(0.5)
+                .set_octaves(4)
+                .set_lacunarity(2.0),
+            biome: Fbm::<Simplex>::new(seed + 1)
+                .set_frequency(0.0001)
+                .set_persistence(0.6)
+                .set_octaves(3)
+                .set_lacunarity(2.0),
+            // detail: Fbm::<Simplex>::new(seed)
+            //     .set_frequency(0.004)
+            //     .set_persistence(0.5)
+            //     .set_octaves(3)
+            //     .set_lacunarity(1.9),
         })
         .add_systems(
             Update,
@@ -55,10 +56,10 @@ pub struct WorldData {
 
 #[derive(Resource, Clone)]
 pub struct NoiseFunctions {
-    pub seed: i32,
-    pub terrain: GeneratorWrapper<SafeNode>,
-    pub biome: GeneratorWrapper<SafeNode>,
-    pub detail: GeneratorWrapper<SafeNode>,
+    pub seed: u32,
+    pub terrain: Fbm<Simplex>,
+    pub biome: Fbm<Simplex>,
+    // pub detail: Fbm<Simplex>,
 }
 
 #[derive(Component)]

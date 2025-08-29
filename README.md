@@ -21,7 +21,6 @@
 ### Requirements
 - [`rust`](https://rustup.rs/)
 - [`clang`](https://clang.llvm.org/)
-- [`cmake`](https://cmake.org/)
 
 ### Building
 1. Clone the repo:\
