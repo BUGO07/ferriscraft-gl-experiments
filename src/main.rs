@@ -1,10 +1,14 @@
-use std::time::{Duration, Instant};
+use std::{
+    fs::File,
+    time::{Duration, Instant},
+};
 
 use bevy_ecs::system::ScheduleSystem;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use gl::types::*;
 use glam::*;
 use glfw::Context;
+use hlua::Lua;
 
 use crate::{
     ecs::*,
@@ -83,7 +87,6 @@ fn main() {
     window.set_scroll_polling(true);
 
     gl::load_with(|s| window.get_proc_address(s) as *const _);
-    gl::Viewport::load_with(|s| window.get_proc_address(s) as *const _);
 
     glfw.set_swap_interval(glfw::SwapInterval::None);
     let (width, height) = window.get_size();
@@ -93,6 +96,14 @@ fn main() {
         width,
         height,
     });
+    let mut lua = Lua::new();
+    // lua.set("x", 2);
+
+    lua.set("print", hlua::function1(|text: String| println!("{text}")));
+    lua.execute_from_reader::<(), _>(File::open("scripts/entry.lua").unwrap())
+        .unwrap();
+
+    app.world.insert_non_send_resource(lua);
     // app.world.insert_non_send_resource(EguiGlium::new(
     //     egui::ViewportId::ROOT,
     //     &facade,
@@ -128,6 +139,12 @@ fn main() {
 
     app.world.run_schedule(Startup);
 
+    {
+        let mut lua = app.world.non_send_resource_mut::<Lua>();
+        let mut lua_startup: hlua::LuaFunction<_> = lua.get("startup").unwrap();
+        let _: () = lua_startup.call().unwrap();
+    }
+
     load_skybox(&mut app.world);
     app.world
         .non_send_resource_mut::<Materials>()
@@ -154,13 +171,21 @@ fn main() {
 
         app.world.run_schedule(PreUpdate);
         app.world.run_schedule(Update);
+        {
+            let mut lua = app.world.non_send_resource_mut::<Lua>();
+            let mut lua_update: hlua::LuaFunction<_> = lua.get("update").unwrap();
+            let _: () = lua_update.call().unwrap();
+        }
         app.world.run_schedule(EguiContextPass);
         app.world.run_schedule(RenderUpdate);
         app.world.run_schedule(PostUpdate);
 
         let mut ns_window = app.world.non_send_resource_mut::<NSWindow>();
         ns_window.context.poll_events();
-        while let Some((_, event)) = events.receive() {
+        for (_, event) in glfw::flush_messages(&events) {
+            if let glfw::WindowEvent::FramebufferSize(x, y) = event {
+                unsafe { gl::Viewport(0, 0, x, y) };
+            }
             app.world.send_event(WindowEventECS(event));
         }
     }
