@@ -1,10 +1,7 @@
-x = 5
-
-function startup()
+function OnStartup()
     print("startup from lua")
 end
 
-function update()
-    x = x + 0.01
-    print("update from lua | number - "..x)
+function OnUpdate()
+    print("update from lua")
 end

@@ -1,14 +1,10 @@
-use std::{
-    fs::File,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use bevy_ecs::system::ScheduleSystem;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use gl::types::*;
 use glam::*;
 use glfw::Context;
-use hlua::Lua;
 
 use crate::{
     ecs::*,
@@ -22,8 +18,10 @@ const SEA_LEVEL: i32 = 64;
 pub mod ecs;
 pub mod world;
 
+mod particles;
 mod player;
 mod render;
+mod scripting;
 mod ui;
 mod utils;
 mod window;
@@ -96,14 +94,7 @@ fn main() {
         width,
         height,
     });
-    let mut lua = Lua::new();
-    // lua.set("x", 2);
 
-    lua.set("print", hlua::function1(|text: String| println!("{text}")));
-    lua.execute_from_reader::<(), _>(File::open("scripts/entry.lua").unwrap())
-        .unwrap();
-
-    app.world.insert_non_send_resource(lua);
     // app.world.insert_non_send_resource(EguiGlium::new(
     //     egui::ViewportId::ROOT,
     //     &facade,
@@ -134,16 +125,12 @@ fn main() {
     world::world_plugin(&mut app);
     ui::ui_plugin(&mut app);
     render::render_plugin(&mut app);
+    particles::particle_plugin(&mut app);
+    scripting::scripting_plugin(&mut app);
 
     AsyncComputeTaskPool::get_or_init(TaskPool::new);
 
     app.world.run_schedule(Startup);
-
-    {
-        let mut lua = app.world.non_send_resource_mut::<Lua>();
-        let mut lua_startup: hlua::LuaFunction<_> = lua.get("startup").unwrap();
-        let _: () = lua_startup.call().unwrap();
-    }
 
     load_skybox(&mut app.world);
     app.world
@@ -171,11 +158,6 @@ fn main() {
 
         app.world.run_schedule(PreUpdate);
         app.world.run_schedule(Update);
-        {
-            let mut lua = app.world.non_send_resource_mut::<Lua>();
-            let mut lua_update: hlua::LuaFunction<_> = lua.get("update").unwrap();
-            let _: () = lua_update.call().unwrap();
-        }
         app.world.run_schedule(EguiContextPass);
         app.world.run_schedule(RenderUpdate);
         app.world.run_schedule(PostUpdate);
