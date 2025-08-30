@@ -139,11 +139,11 @@ impl Material {
                 UniformValue::Bool(b) => gl::Uniform1i(location, b as GLint),
                 UniformValue::Int(i) => gl::Uniform1i(location, i),
                 UniformValue::Float(f) => gl::Uniform1f(location, f),
-                UniformValue::Vec2(v) => gl::Uniform2f(location, v.x, v.y),
-                UniformValue::Vec3(v) => gl::Uniform3f(location, v.x, v.y, v.z),
-                UniformValue::Vec4(v) => gl::Uniform4f(location, v.x, v.y, v.z, v.w),
+                UniformValue::Vec2(v) => gl::Uniform2fv(location, 1, v.as_ref().as_ptr()),
+                UniformValue::Vec3(v) => gl::Uniform3fv(location, 1, v.as_ref().as_ptr()),
+                UniformValue::Vec4(v) => gl::Uniform4fv(location, 1, v.as_ref().as_ptr()),
                 UniformValue::Mat4(m) => {
-                    gl::UniformMatrix4fv(location, 1, gl::FALSE, m.to_cols_array().as_ptr())
+                    gl::UniformMatrix4fv(location, 1, gl::FALSE, m.as_ref().as_ptr())
                 }
             }
         }

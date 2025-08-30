@@ -146,7 +146,7 @@ pub struct DirectionalLight {
     pub illuminance: f32,
 }
 
-#[derive(Component, Clone, Copy)]
+#[derive(Component, Clone, Copy, PartialEq)]
 pub struct Transform {
     pub translation: Vec3,
     pub rotation: Quat,

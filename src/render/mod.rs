@@ -4,6 +4,7 @@ use glfw::{Context, Key};
 use crate::{
     App,
     ecs::*,
+    particles::ParticleEmitter,
     render::{
         material::UniformValue,
         mesh::{Mesh, Vertex},
@@ -33,6 +34,7 @@ fn render_update(
     >,
     camera_query: Single<(&mut Transform, &Camera3d), (Without<Mesh3d>, Without<DirectionalLight>)>,
     light_query: Single<(&Transform, &DirectionalLight), (Without<Mesh3d>, Without<Camera3d>)>,
+    particle_emmiters: Query<&ParticleEmitter>,
     ui_query: Query<&UIText>,
     debug_info: Option<ResMut<DebugInfo>>,
     keyboard: Res<KeyboardInput>,
@@ -173,6 +175,13 @@ fn render_update(
 
             indices += mesh.index_count;
             draw_calls += 1;
+        }
+    }
+
+    // particles
+    {
+        for _emmiter in particle_emmiters.iter() {
+            // TODO
         }
     }
 
