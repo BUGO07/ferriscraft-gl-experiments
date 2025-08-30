@@ -1,3 +1,5 @@
+use hlua::Lua;
+
 use crate::{
     CHUNK_SIZE,
     ecs::*,
@@ -9,6 +11,7 @@ pub fn update_ui(
     mut last_frames: Local<(u32, f32, u32, f32)>, // frame amount accumulated, last_time, last_fps, frame delta accumulated
     time: Res<Time>,
     player: Single<&Transform, With<Camera3d>>,
+    mut lua: NonSendMut<Lua>,
 ) {
     let pt = player.translation;
     let chunk_pos = (pt / CHUNK_SIZE as f32).as_ivec3();
@@ -22,9 +25,7 @@ pub fn update_ui(
 
     let rot = player.rotation.to_euler(EulerRot::YXZ);
 
-    let yaw = (360.0 - rot.0.to_degrees()) % 360.0;
-
-    let facing = match yaw {
+    let facing = match (360.0 - rot.0.to_degrees()) % 360.0 {
         x if (22.5..67.5).contains(&x) => "NE",
         x if (67.5..112.5).contains(&x) => "E",
         x if (112.5..157.5).contains(&x) => "SE",
@@ -45,14 +46,16 @@ pub fn update_ui(
         last_frames.3 = 0.0;
     }
 
+    let x: i32 = lua.get("x").unwrap_or(0);
     debug_text.text = format!(
-        "FPS:    {}\nXYZ:    {:.2}\nChunk:  {:.2}\nBlock:  {:.2}\nFacing: {} / {}'/ {}'",
+        "FPS:    {}\nXYZ:    {:.2}\nChunk:  {:.2}\nBlock:  {:.2}\nFacing: {} / {}'/ {}'\nLUA - {}",
         last_frames.2,
         pt,
         chunk_pos,
         local_block_pos,
         facing,
         -rot.0.to_degrees() as i32,
-        -rot.1.to_degrees() as i32
+        -rot.1.to_degrees() as i32,
+        x
     )
 }

@@ -48,7 +48,7 @@ fn render_update(
         gl::Enable(gl::CULL_FACE);
         gl::CullFace(gl::BACK);
     }
-    let (width, height) = ns_window.window.get_size();
+    let (width, height) = ns_window.window.get_framebuffer_size();
 
     let mut draw_calls = 0;
     let mut indices = 0;

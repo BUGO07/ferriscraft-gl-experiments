@@ -21,9 +21,6 @@ pub fn handle_events(
 ) {
     for event in events.read() {
         match event.0 {
-            WindowEvent::FramebufferSize(x, y) => {
-                unsafe { gl::Viewport(0, 0, x, y) };
-            }
             WindowEvent::Key(key, _scancode, action, _modifiers) => match action {
                 Action::Press => {
                     keyboard.just_pressed.insert(key);
@@ -91,7 +88,7 @@ pub fn handle_window(
         ns_window.window.set_cursor_mode(glfw::CursorMode::Hidden);
     }
 
-    let (width, height) = ns_window.window.get_size();
+    let (width, height) = ns_window.window.get_framebuffer_size();
     window.width = width;
     window.height = height;
 }
