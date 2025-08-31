@@ -66,15 +66,18 @@ pub fn handle_chunk_gen(
                             let (max_y, _biome) = terrain_noise(hpos, &noises);
 
                             for rela_y in 0..CHUNK_SIZE {
-                                chunk.blocks[vec3_to_index(ivec3(rela_x, rela_y, rela_z))] =
-                                    generate_block_at(
-                                        ivec3(
-                                            hpos.x as i32,
-                                            rela_y + pos.y * CHUNK_SIZE,
-                                            hpos.y as i32,
-                                        ),
-                                        max_y,
-                                    );
+                                *unsafe {
+                                    chunk.blocks.get_unchecked_mut(vec3_to_index(ivec3(
+                                        rela_x, rela_y, rela_z,
+                                    )))
+                                } = generate_block_at(
+                                    ivec3(
+                                        hpos.x as i32,
+                                        rela_y + pos.y * CHUNK_SIZE,
+                                        hpos.y as i32,
+                                    ),
+                                    max_y,
+                                );
 
                                 // if rela_y == max_y
                                 //     && max_y > SEA_LEVEL

@@ -91,12 +91,6 @@ impl ChunkMesh {
         chunks: &HashMap<IVec3, Chunk>,
         noises: &NoiseFunctions,
     ) -> Option<Self> {
-        let chunk_pos = chunk.pos;
-
-        let back_chunk = chunks.get(&(chunk_pos - IVec3::Z));
-        let left_chunk = chunks.get(&(chunk_pos - IVec3::X));
-        let down_chunk = chunks.get(&(chunk_pos - IVec3::Y));
-
         // parallelized (thanks rayon)
         let mesh_parts = (0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
             .into_par_iter()
@@ -107,29 +101,35 @@ impl ChunkMesh {
 
                 let current = *unsafe { chunk.blocks.get_unchecked(i as usize) };
 
-                let (back, left, down) =
-                    chunk.get_adjacent_blocks(pos, left_chunk, back_chunk, down_chunk, noises);
+                let (back, left, down) = chunk.get_adjacent_blocks(pos, chunks, noises);
 
                 // TODO fix this so water works properly
                 if !current.is_air() {
                     if left.is_air() {
-                        local_mesh.push_face(chunk, Direction::Left, pos, current, noises);
+                        local_mesh.push_face(chunks, chunk, Direction::Left, pos, current, noises);
                     }
                     if back.is_air() {
-                        local_mesh.push_face(chunk, Direction::Back, pos, current, noises);
+                        local_mesh.push_face(chunks, chunk, Direction::Back, pos, current, noises);
                     }
                     if down.is_air() {
-                        local_mesh.push_face(chunk, Direction::Bottom, pos, current, noises);
+                        local_mesh.push_face(
+                            chunks,
+                            chunk,
+                            Direction::Bottom,
+                            pos,
+                            current,
+                            noises,
+                        );
                     }
                 } else {
                     if !left.is_air() {
-                        local_mesh.push_face(chunk, Direction::Right, pos, left, noises);
+                        local_mesh.push_face(chunks, chunk, Direction::Right, pos, left, noises);
                     }
                     if !back.is_air() {
-                        local_mesh.push_face(chunk, Direction::Front, pos, back, noises);
+                        local_mesh.push_face(chunks, chunk, Direction::Front, pos, back, noises);
                     }
                     if !down.is_air() {
-                        local_mesh.push_face(chunk, Direction::Top, pos, down, noises);
+                        local_mesh.push_face(chunks, chunk, Direction::Top, pos, down, noises);
                     }
                 }
 
@@ -167,13 +167,14 @@ impl ChunkMesh {
     #[inline(always)]
     pub fn push_face(
         &mut self,
+        chunks: &HashMap<IVec3, Chunk>,
         chunk: &Chunk,
         dir: Direction,
         pos: IVec3,
         block: Block,
         noises: &NoiseFunctions,
     ) {
-        let ambient_corners = chunk.ambient_corner_voxels(dir, pos, noises);
+        let ambient_corners = chunk.ambient_corner_voxels(chunks, dir, pos, noises);
         for (i, pos) in Quad::from_direction(dir, pos.as_vec3(), Vec3::ONE)
             .corners
             .iter()
@@ -213,7 +214,7 @@ impl Chunk {
     fn get_relative_block(
         &self,
         relative_pos: IVec3,
-        fallback: Option<&Chunk>,
+        chunks: &HashMap<IVec3, Chunk>,
         noises: &NoiseFunctions,
     ) -> Block {
         let (nx, ny, nz) = (relative_pos.x, relative_pos.y, relative_pos.z);
@@ -227,38 +228,25 @@ impl Chunk {
             };
         }
 
-        let mut chunk_x = self.pos.x;
-        let mut chunk_y = self.pos.y;
-        let mut chunk_z = self.pos.z;
-        let mut lx = nx;
-        let mut ly = ny;
-        let mut lz = nz;
-
-        if nx < 0 {
-            lx += CHUNK_SIZE;
-            chunk_x -= 1;
-        } else if nx >= CHUNK_SIZE {
-            lx -= CHUNK_SIZE;
-            chunk_x += 1;
+        const fn wrap_coord(mut block: i32, mut chunk: i32) -> (i32, i32) {
+            while block < 0 {
+                block += CHUNK_SIZE;
+                chunk -= 1;
+            }
+            while block >= CHUNK_SIZE {
+                block -= CHUNK_SIZE;
+                chunk += 1;
+            }
+            (block, chunk)
         }
 
-        if ny < 0 {
-            ly += CHUNK_SIZE;
-            chunk_y -= 1;
-        } else if ny >= CHUNK_SIZE {
-            ly -= CHUNK_SIZE;
-            chunk_y += 1;
-        }
+        let (lx, chunk_x) = wrap_coord(nx, self.pos.x);
+        let (ly, chunk_y) = wrap_coord(ny, self.pos.y);
+        let (lz, chunk_z) = wrap_coord(nz, self.pos.z);
 
-        if nz < 0 {
-            lz += CHUNK_SIZE;
-            chunk_z -= 1;
-        } else if nz >= CHUNK_SIZE {
-            lz -= CHUNK_SIZE;
-            chunk_z += 1;
-        }
+        let neighbor_pos = ivec3(chunk_x, chunk_y, chunk_z);
 
-        if let Some(chunk) = fallback {
+        if let Some(chunk) = chunks.get(&neighbor_pos) {
             return *unsafe {
                 chunk
                     .blocks
@@ -279,20 +267,19 @@ impl Chunk {
     pub fn get_adjacent_blocks(
         &self,
         pos: IVec3,
-        left_chunk: Option<&Chunk>,
-        back_chunk: Option<&Chunk>,
-        down_chunk: Option<&Chunk>,
+        chunks: &HashMap<IVec3, Chunk>,
         noises: &NoiseFunctions,
     ) -> (Block, Block, Block) {
-        let back = self.get_relative_block(pos - IVec3::Z, back_chunk, noises);
-        let left = self.get_relative_block(pos - IVec3::X, left_chunk, noises);
-        let down = self.get_relative_block(pos - IVec3::Y, down_chunk, noises);
+        let back = self.get_relative_block(pos - IVec3::Z, chunks, noises);
+        let left = self.get_relative_block(pos - IVec3::X, chunks, noises);
+        let down = self.get_relative_block(pos - IVec3::Y, chunks, noises);
 
         (back, left, down)
     }
 
     pub fn ambient_corner_voxels(
         &self,
+        chunks: &HashMap<IVec3, Chunk>,
         dir: Direction,
         pos: IVec3,
         noises: &NoiseFunctions,
@@ -311,7 +298,7 @@ impl Chunk {
         let mut result = [false; 8];
         for i in 0..8 {
             result[i] = !self
-                .get_relative_block(pos + positions[i], None, noises)
+                .get_relative_block(pos + positions[i], chunks, noises)
                 .is_air();
         }
         result
