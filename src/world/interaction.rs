@@ -16,7 +16,7 @@ pub fn place_block(
     // client: Option<ResMut<RenetClient>>,
     update: Option<(&mut Commands, Vec<(Entity, &Transform)>)>,
 ) {
-    chunk.blocks[vec3_to_index(pos)] = block;
+    *unsafe { chunk.blocks.get_unchecked_mut(vec3_to_index(pos)) } = block;
     // if let Some(saved_chunks) = saved_chunks {
     //     saved_chunks
     //         .entry(chunk.pos)
@@ -29,25 +29,25 @@ pub fn place_block(
     //         });
     // }
     if let Some((commands, chunks)) = update {
-        let mut positions = vec![chunk.pos];
-        if pos.x == 0 {
-            positions.push(chunk.pos - IVec3::X);
+        let mut positions = vec![];
+        // also update corner diagonal chunks
+        for x in -1..=1 {
+            if x != 0 && !((x == -1 && pos.x == 0) || (x == 1 && pos.x == CHUNK_SIZE - 1)) {
+                continue;
+            }
+            for y in -1..=1 {
+                if y != 0 && !((y == -1 && pos.y == 0) || (y == 1 && pos.y == CHUNK_SIZE - 1)) {
+                    continue;
+                }
+                for z in -1..=1 {
+                    if z != 0 && !((z == -1 && pos.z == 0) || (z == 1 && pos.z == CHUNK_SIZE - 1)) {
+                        continue;
+                    }
+                    positions.push(chunk.pos + IVec3::new(x, y, z));
+                }
+            }
         }
-        if pos.x == CHUNK_SIZE - 1 {
-            positions.push(chunk.pos + IVec3::X);
-        }
-        if pos.y == 0 {
-            positions.push(chunk.pos - IVec3::Y);
-        }
-        if pos.y == CHUNK_SIZE - 1 {
-            positions.push(chunk.pos + IVec3::Y);
-        }
-        if pos.z == 0 {
-            positions.push(chunk.pos - IVec3::Z);
-        }
-        if pos.z == CHUNK_SIZE - 1 {
-            positions.push(chunk.pos + IVec3::Z);
-        }
+        positions.dedup();
         update_chunks(commands, chunks, positions);
     }
     // ClientPacket::PlaceBlock(chunk.pos * CHUNK_SIZE + pos, block).send(client);
@@ -189,7 +189,7 @@ pub fn ray_cast(
             let block_index = vec3_to_index(local_block_pos);
 
             if block_index < chunk.blocks.len() {
-                let block = chunk.blocks[block_index];
+                let block = *unsafe { chunk.blocks.get_unchecked(block_index) };
 
                 if block.is_solid() {
                     return Some(RayHit {

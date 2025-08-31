@@ -12,7 +12,7 @@ pub fn set_cursor_grab(window: &mut Window, val: bool) {
 }
 
 #[inline]
-pub fn generate_block_at(pos: IVec3, max_y: i32) -> Block {
+pub const fn generate_block_at(pos: IVec3, max_y: i32) -> Block {
     let y = pos.y;
     if y == 0 {
         Block::Bedrock
@@ -53,12 +53,12 @@ pub fn generate_block_at(pos: IVec3, max_y: i32) -> Block {
 }
 
 #[inline]
-pub fn vec3_to_index(pos: IVec3) -> usize {
+pub const fn vec3_to_index(pos: IVec3) -> usize {
     (pos.x + pos.y * CHUNK_SIZE + pos.z * CHUNK_SIZE * CHUNK_SIZE) as usize
 }
 
 #[inline]
-pub fn index_to_vec3(index: usize) -> IVec3 {
+pub const fn index_to_vec3(index: usize) -> IVec3 {
     ivec3(
         index as i32 % CHUNK_SIZE,
         (index as i32 / CHUNK_SIZE) % CHUNK_SIZE,
