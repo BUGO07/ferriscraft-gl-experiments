@@ -1,28 +1,32 @@
-use std::fs::File;
+use mlua::{Function, Lua};
 
 use crate::{App, ecs::*};
-use hlua::Lua;
 
 pub fn scripting_plugin(app: &mut App) {
-    let mut lua = Lua::new();
-    // lua.set("x", 2);
+    let lua = Lua::new();
 
-    lua.set("print", hlua::function1(|text: String| println!("{text}")));
-    lua.execute_from_reader::<(), _>(File::open("scripts/entry.lua").unwrap())
+    lua.globals()
+        .set(
+            "print",
+            lua.create_function(|_, text: String| {
+                println!("{text}");
+                Ok(())
+            })
+            .unwrap(),
+        )
         .unwrap();
+
+    let source = std::fs::read_to_string("scripts/entry.lua").unwrap();
+    lua.load(&source).exec().unwrap();
 
     app.world.insert_non_send_resource(lua);
 
-    app.add_systems(Startup, lua_startup)
-        .add_systems(Update, lua_update);
+    app.add_systems(Startup, |lua: NonSend<Lua>| lua_func(lua, "OnStartup"))
+        .add_systems(Update, |lua: NonSend<Lua>| lua_func(lua, "OnUpdate"));
 }
 
-fn lua_startup(mut lua: NonSendMut<Lua>) {
-    let mut lua_startup: hlua::LuaFunction<_> = lua.get("OnStartup").unwrap();
-    let _: () = lua_startup.call().unwrap();
-}
-
-fn lua_update(mut lua: NonSendMut<Lua>) {
-    let mut lua_update: hlua::LuaFunction<_> = lua.get("OnUpdate").unwrap();
-    let _: () = lua_update.call().unwrap();
+fn lua_func(lua: NonSend<Lua>, name: &str) {
+    if let Ok(func) = lua.globals().get::<Function>(name) {
+        func.call::<()>(()).unwrap();
+    }
 }
