@@ -16,13 +16,15 @@ pub fn scripting_plugin(app: &mut App) {
         )
         .unwrap();
 
-    let source = std::fs::read_to_string("scripts/entry.lua").unwrap();
-    lua.load(&source).exec().unwrap();
+    lua.load(std::fs::read_to_string("scripts/entry.lua").unwrap())
+        .exec()
+        .unwrap();
 
     app.world.insert_non_send_resource(lua);
 
     app.add_systems(Startup, |lua: NonSend<Lua>| lua_func(lua, "OnStartup"))
-        .add_systems(Update, |lua: NonSend<Lua>| lua_func(lua, "OnUpdate"));
+        .add_systems(Update, |lua: NonSend<Lua>| lua_func(lua, "OnUpdate"))
+        .add_systems(Exiting, |lua: NonSend<Lua>| lua_func(lua, "OnExit"));
 }
 
 fn lua_func(lua: NonSend<Lua>, name: &str) {

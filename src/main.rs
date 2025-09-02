@@ -119,6 +119,7 @@ fn main() {
     app.world.add_schedule(Schedule::new(EguiContextPass));
     app.world.add_schedule(Schedule::new(RenderUpdate));
     app.world.add_schedule(Schedule::new(PostUpdate));
+    app.world.add_schedule(Schedule::new(Exiting));
 
     window::window_plugin(&mut app);
     player::player_plugin(&mut app);
@@ -171,6 +172,8 @@ fn main() {
             app.world.send_event(WindowEventECS(event));
         }
     }
+    app.world.run_schedule(Exiting);
+    app.world.clear_all();
 }
 
 fn load_skybox(world: &mut World) {

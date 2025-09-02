@@ -244,3 +244,6 @@ pub struct RenderUpdate;
 
 #[derive(ScheduleLabel, Hash, PartialEq, Eq, Debug, Clone)]
 pub struct PostUpdate;
+
+#[derive(ScheduleLabel, Hash, PartialEq, Eq, Debug, Clone)]
+pub struct Exiting;
