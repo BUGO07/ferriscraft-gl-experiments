@@ -125,6 +125,12 @@ fn render_update(
                 gl::DepthMask(gl::TRUE);
                 gl::DepthFunc(gl::LESS);
             }
+
+            // cleanup
+            {
+                gl::DeleteVertexArrays(1, &skybox_vao);
+                gl::DeleteBuffers(1, &skybox_vbo);
+            }
         }
 
         let vp = perspective * view;
