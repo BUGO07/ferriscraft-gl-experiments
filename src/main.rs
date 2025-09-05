@@ -152,7 +152,7 @@ fn main() {
         app.fu_accumulator += delta;
         let mut time = app.world.resource_mut::<Time>();
         time.delta = delta;
-        time.elapsed += delta.as_secs_f32();
+        time.elapsed += delta.as_secs_f64();
         app.last_update = now;
 
         while app.fu_accumulator >= app.fixed_dt {
