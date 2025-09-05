@@ -13,14 +13,11 @@ use crate::{
     utils::should_cull,
 };
 
-// mod inspector;
 pub mod material;
 pub mod mesh;
 
 pub fn render_plugin(app: &mut App) {
-    app
-        // .add_systems(EguiContextPass, inspector::handle_egui)
-        .add_systems(RenderUpdate, render_update);
+    app.add_systems(RenderUpdate, render_update);
 }
 
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
@@ -39,7 +36,7 @@ fn render_update(
     debug_info: Option<ResMut<DebugInfo>>,
     keyboard: Res<KeyboardInput>,
     // mut egui: NonSendMut<EguiGlium>,
-    skybox_texture: Res<Skybox>,
+    skybox: ResMut<Skybox>,
     mut disable_ao: Local<bool>,
 ) {
     unsafe {
@@ -74,63 +71,26 @@ fn render_update(
 
         let view = camera_transform.as_mat4().inverse();
 
-        // cubemap
+        // skybox
         unsafe {
-            let mut skybox_vao = 0;
-            let mut skybox_vbo = 0;
+            gl::DepthMask(gl::FALSE);
+            gl::DepthFunc(gl::LEQUAL);
 
-            // maybe do this only once
-            {
-                gl::GenVertexArrays(1, &mut skybox_vao);
-                gl::GenBuffers(1, &mut skybox_vbo);
+            let material = &materials.0[2];
+            material.bind();
+            material.set_uniform(
+                c"view",
+                UniformValue::Mat4(Mat4::from_quat(camera_transform.rotation).inverse()),
+            );
+            material.set_uniform(c"perspective", UniformValue::Mat4(perspective));
 
-                gl::BindVertexArray(skybox_vao);
-                gl::BindBuffer(gl::ARRAY_BUFFER, skybox_vbo);
-                gl::BufferData(
-                    gl::ARRAY_BUFFER,
-                    size_of_val(SKYBOX_VERTICES) as isize,
-                    SKYBOX_VERTICES.as_ptr() as *const _,
-                    gl::STATIC_DRAW,
-                );
+            gl::BindVertexArray(skybox.vao);
+            gl::BindTexture(gl::TEXTURE_CUBE_MAP, skybox.texture_id);
+            gl::DrawArrays(gl::TRIANGLES, 0, 36);
+            gl::BindVertexArray(0);
 
-                gl::EnableVertexAttribArray(0);
-                gl::VertexAttribPointer(
-                    0,
-                    3,
-                    gl::FLOAT,
-                    gl::FALSE,
-                    3 * size_of::<GLfloat>() as GLint,
-                    std::ptr::null(),
-                );
-            }
-
-            // drawing
-            {
-                gl::DepthMask(gl::FALSE);
-                gl::DepthFunc(gl::LEQUAL);
-
-                let material = &materials.0[2];
-                material.bind();
-                material.set_uniform(
-                    c"view",
-                    UniformValue::Mat4(Mat4::from_quat(camera_transform.rotation).inverse()),
-                );
-                material.set_uniform(c"perspective", UniformValue::Mat4(perspective));
-
-                gl::BindVertexArray(skybox_vao);
-                gl::BindTexture(gl::TEXTURE_CUBE_MAP, skybox_texture.0);
-                gl::DrawArrays(gl::TRIANGLES, 0, 36);
-                gl::BindVertexArray(0);
-
-                gl::DepthMask(gl::TRUE);
-                gl::DepthFunc(gl::LESS);
-            }
-
-            // cleanup
-            {
-                gl::DeleteVertexArrays(1, &skybox_vao);
-                gl::DeleteBuffers(1, &skybox_vbo);
-            }
+            gl::DepthMask(gl::TRUE);
+            gl::DepthFunc(gl::LESS);
         }
 
         let vp = perspective * view;
@@ -255,8 +215,6 @@ fn render_update(
         debug_info.draw_calls = draw_calls;
     }
     ns_window.window.swap_buffers();
-    // egui.paint(&ns_window.context, &mut target);
-    // target.finish().unwrap();
 }
 
 #[repr(C)]
@@ -278,7 +236,7 @@ impl Vertex for TextVertex {
 }
 
 #[rustfmt::skip]
-pub const SKYBOX_VERTICES: &[f32] = &[
+pub const CUBEMAP_VERTICES: &[f32] = &[
     -1.0,  1.0, -1.0,
     -1.0, -1.0, -1.0,
      1.0, -1.0, -1.0,
