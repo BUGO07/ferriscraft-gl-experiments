@@ -253,11 +253,7 @@ pub fn process_tasks(
     //     .map(|saved_chunks| saved_chunks.write().unwrap());
     let mut loading_chunks = world_data.loading_chunks.write().unwrap();
 
-    let mut processed_this_frame = 0;
     for (entity, mut compute_task) in tasks {
-        if processed_this_frame >= 15 {
-            break;
-        }
         if let Some(chunk) = future::block_on(future::poll_once(&mut compute_task.0)) {
             // if let Some(saved_chunks) = &mut saved_chunks {
             //     saved_chunks
@@ -298,8 +294,6 @@ pub fn process_tasks(
 
             loading_chunks.remove(&chunk.pos);
             chunks.insert(chunk.pos, chunk);
-
-            processed_this_frame += 1;
         }
     }
 
@@ -308,23 +302,15 @@ pub fn process_tasks(
     let mut tasks = mesh_tasks.into_iter().collect::<Vec<_>>();
     tasks.par_sort_by_cached_key(|(_, x)| x.1.distance_squared(pt));
 
-    let mut processed_this_frame = 0;
     for (entity, mut compute_task) in tasks {
-        if processed_this_frame >= 15 {
-            break;
-        }
-
         if let Some(result) = future::block_on(future::poll_once(&mut compute_task.0)) {
             commands.entity(entity).try_remove::<ComputeChunkMesh>();
 
             if let Some(mesh_data) = result {
-                commands.entity(entity).try_insert((
-                    meshes.add(mesh_data),
-                    MeshMaterial(0), // MeshMaterial3d(world_data.materials[0].clone()),
-                                     // Visibility::Visible,
-                ));
+                commands
+                    .entity(entity)
+                    .try_insert((meshes.add(mesh_data), MeshMaterial(0)));
             }
-            processed_this_frame += 1;
         }
     }
 }

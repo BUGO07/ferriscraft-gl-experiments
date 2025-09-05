@@ -6,7 +6,7 @@ use crate::{
 
 pub fn update_ui(
     mut debug_text: Single<&mut UIText, With<DebugText>>,
-    mut last_frames: Local<(u32, f32, u32, f32)>, // frame amount accumulated, last_time, last_fps, frame delta accumulated
+    mut last_frames: Local<(u32, f64, u32, f64)>, // frame count, time, last fps, last update time
     time: Res<Time>,
     player: Single<&Transform, With<Camera3d>>,
 ) {
@@ -20,9 +20,9 @@ pub fn update_ui(
     )
     .as_ivec3();
 
-    let rot = player.rotation.to_euler(EulerRot::YXZ);
+    let (yaw, pitch, _) = player.rotation.to_euler(EulerRot::YXZ);
 
-    let facing = match (360.0 - rot.0.to_degrees()) % 360.0 {
+    let facing = match (360.0 - yaw.to_degrees()) % 360.0 {
         x if (22.5..67.5).contains(&x) => "NE",
         x if (67.5..112.5).contains(&x) => "E",
         x if (112.5..157.5).contains(&x) => "SE",
@@ -33,24 +33,26 @@ pub fn update_ui(
         _ => "N",
     };
 
+    let (f, t, lf, lt) = &mut *last_frames;
+
     // hell nawww
-    last_frames.0 += 1;
-    last_frames.3 += time.delta_secs();
-    if last_frames.1 + 0.25 < time.elapsed_secs() {
-        last_frames.2 = (last_frames.0 as f32 / last_frames.3) as u32;
-        last_frames.1 = time.elapsed_secs();
-        last_frames.0 = 0;
-        last_frames.3 = 0.0;
+    *f += 1;
+    *t += time.delta_secs_f64();
+    if *lt + 0.25 < time.elapsed_secs_f64() {
+        *lf = (*f as f64 / *t) as u32;
+        *lt = time.elapsed_secs_f64();
+        *f = 0;
+        *t = 0.0;
     }
 
     debug_text.text = format!(
         "FPS:    {}\nXYZ:    {:.2}\nChunk:  {:.2}\nBlock:  {:.2}\nFacing: {} / {}'/ {}'",
-        last_frames.2,
+        *lf,
         pt,
         chunk_pos,
         local_block_pos,
         facing,
-        -rot.0.to_degrees() as i32,
-        -rot.1.to_degrees() as i32,
+        -yaw.to_degrees() as i32,
+        -pitch.to_degrees() as i32,
     )
 }
