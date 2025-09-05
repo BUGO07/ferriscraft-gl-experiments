@@ -4,9 +4,9 @@ use std::{
 };
 
 pub use bevy_ecs::{prelude::*, schedule::ScheduleLabel};
-use gl::types::GLint;
 pub use glam::*;
 
+use gl::types::*;
 use glfw::{Glfw, Key, MouseButton, PWindow};
 
 use crate::{render::material::Material, world::mesher::ChunkMesh};
@@ -114,7 +114,11 @@ impl Materials {
 }
 
 #[derive(Resource)]
-pub struct Skybox(pub u32);
+pub struct Skybox {
+    pub texture_id: GLuint,
+    pub vao: GLuint,
+    pub vbo: GLuint,
+}
 
 #[derive(Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Mesh3d(pub usize);

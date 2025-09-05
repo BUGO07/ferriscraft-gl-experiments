@@ -8,7 +8,10 @@ use glfw::Context;
 
 use crate::{
     ecs::*,
-    render::material::{Material, MaterialOptions},
+    render::{
+        CUBEMAP_VERTICES,
+        material::{Material, MaterialOptions},
+    },
     window::WindowEventECS,
 };
 
@@ -21,7 +24,7 @@ pub mod world;
 mod particles;
 mod player;
 mod render;
-mod scripting;
+// mod scripting;
 mod ui;
 mod utils;
 mod window;
@@ -84,7 +87,7 @@ fn main() {
     window.set_mouse_button_polling(true);
     window.set_scroll_polling(true);
 
-    gl::load_with(|s| window.get_proc_address(s) as *const _);
+    gl::load_with(|s| window.get_proc_address(s).unwrap() as *const _);
 
     glfw.set_swap_interval(glfw::SwapInterval::None);
     let (width, height) = window.get_size();
@@ -127,7 +130,7 @@ fn main() {
     ui::ui_plugin(&mut app);
     render::render_plugin(&mut app);
     particles::particle_plugin(&mut app);
-    scripting::scripting_plugin(&mut app);
+    // scripting::scripting_plugin(&mut app);
 
     AsyncComputeTaskPool::get_or_init(TaskPool::new);
 
@@ -163,8 +166,7 @@ fn main() {
         app.world.run_schedule(RenderUpdate);
         app.world.run_schedule(PostUpdate);
 
-        let mut ns_window = app.world.non_send_resource_mut::<NSWindow>();
-        ns_window.context.poll_events();
+        unsafe { glfw::ffi::glfwPollEvents() };
         for (_, event) in glfw::flush_messages(&events) {
             if let glfw::WindowEvent::FramebufferSize(x, y) = event {
                 unsafe { gl::Viewport(0, 0, x, y) };
@@ -172,17 +174,42 @@ fn main() {
             app.world.send_event(WindowEventECS(event));
         }
     }
+
     app.world.run_schedule(Exiting);
     app.world.clear_all();
 }
 
 fn load_skybox(world: &mut World) {
     let mut texture_id: GLuint = 0;
+    let mut vao: GLuint = 0;
+    let mut vbo: GLuint = 0;
 
     unsafe {
+        gl::GenBuffers(1, &mut vbo);
+
+        gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+        gl::BufferData(
+            gl::ARRAY_BUFFER,
+            size_of_val(CUBEMAP_VERTICES) as isize,
+            CUBEMAP_VERTICES.as_ptr() as *const _,
+            gl::STATIC_DRAW,
+        );
+
+        gl::GenVertexArrays(1, &mut vao);
+
+        gl::BindVertexArray(vao);
+        gl::VertexAttribPointer(
+            0,
+            3,
+            gl::FLOAT,
+            gl::FALSE,
+            3 * size_of::<GLfloat>() as GLint,
+            std::ptr::null(),
+        );
+        gl::EnableVertexAttribArray(0);
+
         gl::GenTextures(1, &mut texture_id);
         gl::BindTexture(gl::TEXTURE_CUBE_MAP, texture_id);
-
         for (i, &face) in ["face0", "face1", "face2", "face3", "face4", "face5"]
             .iter()
             .enumerate()
@@ -232,5 +259,9 @@ fn load_skybox(world: &mut World) {
         );
     }
 
-    world.insert_resource(Skybox(texture_id as u32));
+    world.insert_resource(Skybox {
+        texture_id,
+        vao,
+        vbo,
+    });
 }
