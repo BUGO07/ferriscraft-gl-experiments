@@ -76,7 +76,7 @@ fn render_update(
         let (camera_transform, camera) = camera_query.into_inner();
         let (light_transform, light) = light_query.into_inner();
 
-        let perspective = Mat4::perspective_rh_gl(
+        let projection = Mat4::perspective_rh_gl(
             camera.fov.to_radians(),
             width as f32 / height as f32,
             camera.near,
@@ -92,11 +92,11 @@ fn render_update(
 
             let material = &materials.0[3];
             material.bind();
+            material.set_uniform(c"projection", UniformValue::Mat4(projection));
             material.set_uniform(
                 c"view",
                 UniformValue::Mat4(Mat4::from_quat(camera_transform.rotation).inverse()),
             );
-            material.set_uniform(c"perspective", UniformValue::Mat4(perspective));
 
             gl::BindVertexArray(skybox.vao);
             gl::BindTexture(gl::TEXTURE_CUBE_MAP, skybox.texture_id);
@@ -107,8 +107,8 @@ fn render_update(
             gl::DepthFunc(gl::LESS);
         }
 
-        let vp = perspective * view;
         let frustum = {
+            let vp = projection * view;
             let row1 = vp.row(0);
             let row2 = vp.row(1);
             let row3 = vp.row(2);
@@ -158,7 +158,7 @@ fn render_update(
             };
             let material = &materials.0[1]; // projectile
             material.bind();
-            material.set_uniform(c"perspective", UniformValue::Mat4(perspective));
+            material.set_uniform(c"projection", UniformValue::Mat4(projection));
             material.set_uniform(c"view", UniformValue::Mat4(view));
             material.set_uniform(c"model", UniformValue::Mat4(proj_transform.as_mat4()));
             mesh.draw();
@@ -177,7 +177,7 @@ fn render_update(
             let material = &materials.0[material_id.0];
 
             material.bind();
-            material.set_uniform(c"perspective", UniformValue::Mat4(perspective));
+            material.set_uniform(c"projection", UniformValue::Mat4(projection));
             material.set_uniform(c"view", UniformValue::Mat4(view));
             material.set_uniform(c"model", UniformValue::Mat4(chunk_transform.as_mat4()));
             material.set_uniform(

@@ -9,7 +9,7 @@ out float v_ao;
 
 flat out uint v_block_id;
 
-uniform mat4 perspective;
+uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
 
@@ -56,7 +56,7 @@ void main() {
     vec3 n = normals[int(normal)];
     mat4 modelview = view * model;
 
-    gl_Position = perspective * modelview * vec4(pos, 1.0);
+    gl_Position = projection * modelview * vec4(pos, 1.0);
 
     v_pos = gl_Position.xyz / gl_Position.w;
     v_normal = normalize(transpose(inverse(mat3(modelview))) * n);
