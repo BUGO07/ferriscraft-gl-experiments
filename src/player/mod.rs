@@ -16,7 +16,8 @@ pub mod movement;
 
 pub fn player_plugin(app: &mut App) {
     app.add_systems(Startup, setup)
-        .add_systems(Update, (movement::handle_movement, handle_interactions));
+        .add_systems(Update, (movement::handle_movement, handle_interactions))
+        .add_systems(FixedUpdate, update_projectiles);
 }
 
 pub fn setup(
@@ -57,6 +58,9 @@ pub fn setup(
         )
         .unwrap(),
     );
+
+    // materials[1]
+    materials.add(Material::new("projectile", MaterialOptions::default()).unwrap());
 }
 
 fn handle_interactions(
@@ -116,5 +120,35 @@ fn handle_interactions(
                 );
             }
         }
+    } else if mouse.just_pressed(MouseButton::Right) {
+        commands.spawn((
+            Projectile {
+                velocity: player.rotation * Vec3::NEG_Z * 10.0,
+            },
+            Transform::from_translation(player.translation),
+        ));
     }
+}
+
+pub fn update_projectiles(
+    mut commands: Commands,
+    mut projectiles: Query<(Entity, &mut Transform, &mut Projectile)>,
+    time: Res<Time>,
+) {
+    for (entity, mut transform, mut projectile) in projectiles.iter_mut() {
+        projectile.velocity *= 0.95;
+        transform.translation += projectile.velocity * time.delta_secs() * 500.0; // maybe mess around w this
+        transform.translation.y -= 100.0 * time.delta_secs(); // gravity
+
+        println!(
+            "pos: {:?} velocity: {}",
+            transform.translation,
+            projectile.velocity.length_squared()
+        );
+    }
+}
+
+#[derive(Component)]
+pub struct Projectile {
+    pub velocity: Vec3,
 }

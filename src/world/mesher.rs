@@ -55,7 +55,7 @@ pub enum Direction {
 }
 
 impl Direction {
-    const NORMALS: [[i32; 3]; 6] = [
+    pub const NORMALS: [[i32; 3]; 6] = [
         [-1, 0, 0],
         [1, 0, 0],
         [0, -1, 0],

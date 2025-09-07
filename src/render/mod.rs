@@ -5,12 +5,14 @@ use crate::{
     App,
     ecs::*,
     particles::ParticleEmitter,
+    player::Projectile,
     render::{
         material::UniformValue,
         mesh::{Mesh, Vertex},
     },
     ui::UIText,
-    utils::should_cull,
+    utils::{Quad, should_cull},
+    world::mesher::Direction,
 };
 
 pub mod material;
@@ -27,9 +29,21 @@ fn render_update(
     materials: NonSend<Materials>,
     mesh_entities: Query<
         (&Transform, &Mesh3d, &MeshMaterial, &Aabb),
-        (Without<Camera3d>, Without<DirectionalLight>),
+        (
+            Without<Camera3d>,
+            Without<DirectionalLight>,
+            Without<Projectile>,
+        ),
     >,
-    camera_query: Single<(&mut Transform, &Camera3d), (Without<Mesh3d>, Without<DirectionalLight>)>,
+    projectile_query: Query<&Transform, With<Projectile>>,
+    camera_query: Single<
+        (&mut Transform, &Camera3d),
+        (
+            Without<Mesh3d>,
+            Without<DirectionalLight>,
+            Without<Projectile>,
+        ),
+    >,
     light_query: Single<(&Transform, &DirectionalLight), (Without<Mesh3d>, Without<Camera3d>)>,
     particle_emmiters: Query<&ParticleEmitter>,
     ui_query: Query<&UIText>,
@@ -76,7 +90,7 @@ fn render_update(
             gl::DepthMask(gl::FALSE);
             gl::DepthFunc(gl::LEQUAL);
 
-            let material = &materials.0[2];
+            let material = &materials.0[3];
             material.bind();
             material.set_uniform(
                 c"view",
@@ -110,6 +124,40 @@ fn render_update(
                 row4 - row3,
             ]
         };
+
+        for proj_transform in projectile_query.iter() {
+            use Direction::*;
+
+            let mut vertices = Vec::new();
+            for dir in [Left, Right, Bottom, Top, Back, Front] {
+                let size = 0.5;
+                let quad = Quad::from_direction(
+                    dir,
+                    dir.as_ivec3().as_vec3().max(Vec3::ZERO) * size,
+                    Vec3::ONE * size,
+                );
+                for pos in quad.corners {
+                    vertices.push(ProjectileVertex { pos });
+                }
+            }
+            let indices = (0..vertices.len())
+                .step_by(4)
+                .flat_map(|i| {
+                    let idx = i as u32;
+                    [idx, idx + 1, idx + 2, idx, idx + 2, idx + 3]
+                })
+                .collect::<Vec<_>>();
+
+            let Ok(mesh) = Mesh::new(&vertices, &indices) else {
+                continue;
+            };
+            let material = &materials.0[1]; // projectile
+            material.bind();
+            material.set_uniform(c"perspective", UniformValue::Mat4(perspective));
+            material.set_uniform(c"view", UniformValue::Mat4(view));
+            material.set_uniform(c"model", UniformValue::Mat4(proj_transform.as_mat4()));
+            mesh.draw();
+        }
 
         for (chunk_transform, mesh_id, material_id, aabb) in mesh_entities.iter() {
             if should_cull(&frustum, chunk_transform.translation, aabb) {
@@ -215,6 +263,18 @@ fn render_update(
         debug_info.draw_calls = draw_calls;
     }
     ns_window.window.swap_buffers();
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+struct ProjectileVertex {
+    pos: [f32; 3],
+}
+
+impl Vertex for ProjectileVertex {
+    fn attributes() -> &'static [(GLuint, GLint, GLenum, GLboolean, usize)] {
+        &[(0, 3, gl::FLOAT, gl::FALSE, 0)]
+    }
 }
 
 #[repr(C)]
