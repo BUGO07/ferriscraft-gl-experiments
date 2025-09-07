@@ -44,6 +44,10 @@ impl App {
         self.world.insert_resource(resource);
         self
     }
+    fn init_non_send_resource<R: Default + 'static>(&mut self) -> &mut Self {
+        self.world.init_non_send_resource::<R>();
+        self
+    }
     fn add_systems<M>(
         &mut self,
         schedule: impl ScheduleLabel,
@@ -104,8 +108,6 @@ fn main() {
         window,
         context: glfw,
     });
-    app.world.init_non_send_resource::<Meshes>();
-    app.world.init_non_send_resource::<Materials>();
 
     #[cfg(debug_assertions)]
     app.world.init_resource::<DebugInfo>();
@@ -123,6 +125,7 @@ fn main() {
     app.world.add_schedule(Schedule::new(FixedUpdate));
     app.world.add_schedule(Schedule::new(EguiContextPass));
     app.world.add_schedule(Schedule::new(RenderUpdate));
+    app.world.add_schedule(Schedule::new(PostRenderUpdate));
     app.world.add_schedule(Schedule::new(PostUpdate));
     app.world.add_schedule(Schedule::new(Exiting));
 
@@ -139,9 +142,6 @@ fn main() {
     app.world.run_schedule(Startup);
 
     load_skybox(&mut app.world);
-    app.world
-        .non_send_resource_mut::<Materials>()
-        .add(Material::new("skybox", MaterialOptions::default()).unwrap());
 
     while !app
         .world
@@ -177,6 +177,7 @@ fn main() {
         app.world.run_schedule(Update);
         app.world.run_schedule(EguiContextPass);
         app.world.run_schedule(RenderUpdate);
+        app.world.run_schedule(PostRenderUpdate);
         app.world.run_schedule(PostUpdate);
 
         unsafe { glfw::ffi::glfwPollEvents() };
@@ -272,7 +273,12 @@ fn load_skybox(world: &mut World) {
         );
     }
 
+    let material_id = world
+        .non_send_resource_mut::<Materials>()
+        .add(Material::new("skybox", MaterialOptions::default()).unwrap())
+        .0;
     world.insert_resource(Skybox {
+        material_id,
         texture_id,
         vao,
         vbo,

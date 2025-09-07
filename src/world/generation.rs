@@ -184,7 +184,7 @@ pub fn handle_mesh_gen(
 #[allow(clippy::type_complexity)]
 pub fn handle_chunk_despawn(
     mut commands: Commands,
-    mut meshes: NonSendMut<Meshes>,
+    mut meshes: ResMut<Meshes>,
     world_data: Res<WorldData>,
     query: Query<
         (Entity, &Transform, Option<&Mesh3d>),
@@ -234,7 +234,7 @@ pub fn handle_chunk_despawn(
 
 pub fn process_tasks(
     mut commands: Commands,
-    mut meshes: NonSendMut<Meshes>,
+    mut meshes: ResMut<Meshes>,
     player: Single<&Transform, With<Camera3d>>,
     mesh_tasks: Query<(Entity, &mut ComputeChunkMesh)>,
     spawn_tasks: Query<(Entity, &mut ComputeChunk)>,

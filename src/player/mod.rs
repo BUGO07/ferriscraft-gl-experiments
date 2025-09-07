@@ -59,8 +59,17 @@ pub fn setup(
         .unwrap(),
     );
 
-    // materials[1]
-    materials.add(Material::new("projectile", MaterialOptions::default()).unwrap());
+    // plrimitive
+    materials.add(
+        Material::new(
+            "primitive",
+            MaterialOptions {
+                base_color: Some(Vec4::new(0.8, 0.8, 0.8, 1.0)),
+                ..Default::default()
+            },
+        )
+        .unwrap(),
+    );
 }
 
 fn handle_interactions(

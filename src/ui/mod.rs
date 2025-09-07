@@ -1,9 +1,14 @@
 #![allow(dead_code)]
 
+use gl::types::*;
+
 use crate::{
     App,
     ecs::*,
-    render::material::{Material, MaterialOptions},
+    render::{
+        material::{Material, MaterialOptions},
+        mesh::Vertex,
+    },
 };
 
 pub mod update;
@@ -117,5 +122,23 @@ impl UIText {
             text,
             material,
         }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct TextVertex {
+    pub position: [f32; 2],
+    pub char_id: u32,
+    // size: [f32; 2],
+}
+
+impl Vertex for TextVertex {
+    fn attributes() -> &'static [(GLuint, GLint, GLenum, GLboolean, usize)] {
+        &[
+            (0, 2, gl::FLOAT, gl::FALSE, 0),
+            (1, 1, gl::UNSIGNED_INT, gl::FALSE, size_of::<[f32; 2]>()),
+            // (2, 2, gl::FLOAT, gl::FALSE, size_of::<[f32; 2]>()),
+        ]
     }
 }

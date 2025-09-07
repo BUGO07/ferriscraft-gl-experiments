@@ -3,7 +3,7 @@ use glam::*;
 use crate::{
     CHUNK_SIZE, SEA_LEVEL,
     ecs::{Aabb, Window},
-    world::mesher::{Block, Direction},
+    world::mesher::Block,
 };
 
 pub fn set_cursor_grab(window: &mut Window, val: bool) {
@@ -65,57 +65,8 @@ pub const fn index_to_vec3(index: usize) -> IVec3 {
         index as i32 / (CHUNK_SIZE * CHUNK_SIZE),
     )
 }
-pub struct Quad {
-    pub corners: [[f32; 3]; 4],
-}
 
-impl Quad {
-    #[inline]
-    pub const fn from_direction(direction: Direction, pos: Vec3, size: Vec3) -> Self {
-        let corners = match direction {
-            Direction::Left => [
-                [pos.x, pos.y, pos.z],
-                [pos.x, pos.y, pos.z + size.z],
-                [pos.x, pos.y + size.y, pos.z + size.z],
-                [pos.x, pos.y + size.y, pos.z],
-            ],
-            Direction::Right => [
-                [pos.x, pos.y + size.y, pos.z],
-                [pos.x, pos.y + size.y, pos.z + size.z],
-                [pos.x, pos.y, pos.z + size.z],
-                [pos.x, pos.y, pos.z],
-            ],
-            Direction::Bottom => [
-                [pos.x, pos.y, pos.z],
-                [pos.x + size.x, pos.y, pos.z],
-                [pos.x + size.x, pos.y, pos.z + size.z],
-                [pos.x, pos.y, pos.z + size.z],
-            ],
-            Direction::Top => [
-                [pos.x, pos.y, pos.z + size.z],
-                [pos.x + size.x, pos.y, pos.z + size.z],
-                [pos.x + size.x, pos.y, pos.z],
-                [pos.x, pos.y, pos.z],
-            ],
-            Direction::Back => [
-                [pos.x, pos.y, pos.z],
-                [pos.x, pos.y + size.y, pos.z],
-                [pos.x + size.x, pos.y + size.y, pos.z],
-                [pos.x + size.x, pos.y, pos.z],
-            ],
-            Direction::Front => [
-                [pos.x + size.x, pos.y, pos.z],
-                [pos.x + size.x, pos.y + size.y, pos.z],
-                [pos.x, pos.y + size.y, pos.z],
-                [pos.x, pos.y, pos.z],
-            ],
-        };
-
-        Self { corners }
-    }
-}
-
-pub fn should_cull(frustum: &[Vec4; 6], pos: Vec3, aabb: &Aabb) -> bool {
+pub fn should_cull_aabb(frustum: &[Vec4; 6], pos: Vec3, aabb: &Aabb) -> bool {
     for plane in frustum {
         let mut n_vertex = aabb.min + pos;
         if plane.x > 0.0 {
@@ -129,6 +80,16 @@ pub fn should_cull(frustum: &[Vec4; 6], pos: Vec3, aabb: &Aabb) -> bool {
         }
 
         if plane.xyz().dot(n_vertex) + plane.w < 0.0 {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn should_cull_sphere(frustum: &[Vec4; 6], pos: Vec3, radius: f32) -> bool {
+    for plane in frustum {
+        let distance = plane.xyz().dot(pos) + plane.w;
+        if distance < -radius {
             return true;
         }
     }

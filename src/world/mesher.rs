@@ -7,8 +7,8 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
     CHUNK_SIZE, SEA_LEVEL,
-    render::mesh::Vertex,
-    utils::{Quad, generate_block_at, index_to_vec3, vec3_to_index},
+    render::{mesh::Vertex, primitives::Quad},
+    utils::{generate_block_at, index_to_vec3, vec3_to_index},
     world::NoiseFunctions,
 };
 
@@ -175,11 +175,7 @@ impl ChunkMesh {
         noises: &NoiseFunctions,
     ) {
         let ambient_corners = chunk.ambient_corner_voxels(chunks, dir, pos, noises);
-        for (i, pos) in Quad::from_direction(dir, pos.as_vec3(), Vec3::ONE)
-            .corners
-            .iter()
-            .enumerate()
-        {
+        for (i, pos) in Quad::new(dir, pos.as_vec3(), Vec3::ONE).iter().enumerate() {
             let index = i * 2;
 
             let side_1 = ambient_corners[index] as u8;

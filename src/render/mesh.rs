@@ -77,10 +77,15 @@ impl<V: Vertex> Mesh<V> {
         })
     }
 
-    pub fn draw(&self) {
+    pub fn draw(&self) -> usize {
         unsafe {
+            let mut size = 0;
+            gl::BindBuffer(gl::ARRAY_BUFFER, self.vbo);
+            gl::GetBufferParameteriv(gl::ARRAY_BUFFER, gl::BUFFER_SIZE, &mut size);
             gl::BindVertexArray(self.vao);
             gl::DrawElements(gl::TRIANGLES, self.index_count, gl::UNSIGNED_INT, null());
+
+            (size as usize / size_of::<V>()) / 3
         }
     }
 }

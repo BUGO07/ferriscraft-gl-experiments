@@ -27,8 +27,7 @@ pub struct Window {
 #[derive(Resource, Debug, Default)]
 pub struct DebugInfo {
     pub draw_calls: usize,
-    pub vertices: usize,
-    pub indices: usize,
+    pub triangles: usize,
 }
 
 #[derive(Resource, Debug, Default)]
@@ -105,7 +104,7 @@ impl KeyboardInput {
     }
 }
 
-#[derive(Default)]
+#[derive(Resource, Default)]
 pub struct Meshes(pub HashMap<usize, ChunkMesh>, pub usize);
 
 impl Meshes {
@@ -129,6 +128,7 @@ impl Materials {
 
 #[derive(Resource)]
 pub struct Skybox {
+    pub material_id: usize,
     pub texture_id: GLuint,
     pub vao: GLuint,
     pub vbo: GLuint,
@@ -259,6 +259,9 @@ pub struct EguiContextPass;
 
 #[derive(ScheduleLabel, Hash, PartialEq, Eq, Debug, Clone)]
 pub struct RenderUpdate;
+
+#[derive(ScheduleLabel, Hash, PartialEq, Eq, Debug, Clone)]
+pub struct PostRenderUpdate;
 
 #[derive(ScheduleLabel, Hash, PartialEq, Eq, Debug, Clone)]
 pub struct PostUpdate;
