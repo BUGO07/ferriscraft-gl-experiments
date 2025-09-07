@@ -32,12 +32,13 @@ pub struct DebugInfo {
 }
 
 #[derive(Resource, Debug, Default)]
-pub struct Time {
+pub struct Time<T = UpdateTime> {
     pub delta: Duration,
     pub elapsed: f64,
+    pub extra: T,
 }
 
-impl Time {
+impl<T> Time<T> {
     pub fn delta_secs(&self) -> f32 {
         self.delta.as_secs_f32()
     }
@@ -50,6 +51,13 @@ impl Time {
     pub fn elapsed_secs_f64(&self) -> f64 {
         self.elapsed
     }
+}
+
+#[derive(Default)]
+pub struct UpdateTime;
+#[derive(Default)]
+pub struct FixedTime {
+    pub accumulator: Duration,
 }
 
 #[derive(Resource, Debug, Default)]

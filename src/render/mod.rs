@@ -35,7 +35,7 @@ fn render_update(
             Without<Projectile>,
         ),
     >,
-    projectile_query: Query<&Transform, With<Projectile>>,
+    projectile_query: Query<(&Transform, &Projectile)>,
     camera_query: Single<
         (&mut Transform, &Camera3d),
         (
@@ -125,19 +125,24 @@ fn render_update(
             ]
         };
 
-        for proj_transform in projectile_query.iter() {
+        for (proj_transform, projectile) in projectile_query.iter() {
             use Direction::*;
 
             let mut vertices = Vec::new();
-            for dir in [Left, Right, Bottom, Top, Back, Front] {
-                let size = 0.5;
-                let quad = Quad::from_direction(
-                    dir,
-                    dir.as_ivec3().as_vec3().max(Vec3::ZERO) * size,
-                    Vec3::ONE * size,
-                );
-                for pos in quad.corners {
-                    vertices.push(ProjectileVertex { pos });
+            for offset in -1..=1 {
+                // idk can be better
+                for dir in [Left, Right, Bottom, Top, Back, Front] {
+                    let size = 0.25;
+                    let quad = Quad::from_direction(
+                        dir,
+                        (dir.as_ivec3().as_vec3().max(Vec3::ZERO)
+                            + offset as f32 * projectile.direction)
+                            * size,
+                        Vec3::ONE * size,
+                    );
+                    for pos in quad.corners {
+                        vertices.push(ProjectileVertex { pos });
+                    }
                 }
             }
             let indices = (0..vertices.len())

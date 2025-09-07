@@ -32,8 +32,6 @@ mod window;
 pub struct App {
     world: World,
     last_update: Instant,
-    fu_accumulator: Duration,
-    fixed_dt: Duration,
 }
 
 impl App {
@@ -62,8 +60,6 @@ fn main() {
     let mut app = App {
         world: World::new(),
         last_update: Instant::now(),
-        fu_accumulator: Duration::ZERO,
-        fixed_dt: Duration::from_secs_f32(1.0 / 64.0),
     };
     let mut glfw = glfw::init(glfw::fail_on_errors).unwrap();
     glfw.window_hint(glfw::WindowHint::ContextVersionMajor(3));
@@ -114,6 +110,12 @@ fn main() {
     #[cfg(debug_assertions)]
     app.world.init_resource::<DebugInfo>();
 
+    app.world.init_resource::<Time<UpdateTime>>();
+    app.world.insert_resource(Time::<FixedTime> {
+        delta: Duration::from_secs_f32(1.0 / 64.0),
+        ..Default::default()
+    });
+
     // in this exact order
     app.world.add_schedule(Schedule::new(Startup));
     app.world.add_schedule(Schedule::new(PreUpdate));
@@ -149,15 +151,26 @@ fn main() {
     {
         let now = Instant::now();
         let delta = now.duration_since(app.last_update);
-        app.fu_accumulator += delta;
+        app.world
+            .resource_mut::<Time<FixedTime>>()
+            .extra
+            .accumulator += delta;
         let mut time = app.world.resource_mut::<Time>();
         time.delta = delta;
         time.elapsed += delta.as_secs_f64();
         app.last_update = now;
 
-        while app.fu_accumulator >= app.fixed_dt {
+        while {
+            let fixed_time = app.world.resource::<Time<FixedTime>>();
+            fixed_time.extra.accumulator >= fixed_time.delta
+        } {
+            {
+                let mut fixed_time = app.world.resource_mut::<Time<FixedTime>>();
+                fixed_time.elapsed += fixed_time.delta_secs_f64();
+                let delta = fixed_time.delta;
+                fixed_time.extra.accumulator -= delta;
+            }
             app.world.run_schedule(FixedUpdate);
-            app.fu_accumulator -= app.fixed_dt;
         }
 
         app.world.run_schedule(PreUpdate);

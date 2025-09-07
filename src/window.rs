@@ -9,7 +9,6 @@ pub fn window_plugin(app: &mut App) {
     app.world.init_resource::<Events<WindowEventECS>>();
     app.world.init_resource::<KeyboardInput>();
     app.world.init_resource::<MouseInput>();
-    app.world.init_resource::<Time>();
     app.add_systems(PreUpdate, handle_events)
         .add_systems(PostUpdate, (handle_input_cleanup, handle_window));
 }

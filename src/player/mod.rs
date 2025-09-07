@@ -121,9 +121,13 @@ fn handle_interactions(
             }
         }
     } else if mouse.just_pressed(MouseButton::Right) {
+        let direction = player.rotation * Vec3::NEG_Z;
+        let speed = 50.0; // TODO change between 35-50 depending on how long the right click was held
         commands.spawn((
             Projectile {
-                velocity: player.rotation * Vec3::NEG_Z * 10.0,
+                direction,
+                velocity: direction * speed,
+                lifespan: 60.0,
             },
             Transform::from_translation(player.translation),
         ));
@@ -133,22 +137,44 @@ fn handle_interactions(
 pub fn update_projectiles(
     mut commands: Commands,
     mut projectiles: Query<(Entity, &mut Transform, &mut Projectile)>,
-    time: Res<Time>,
+    time: Res<Time<FixedTime>>,
+    world_data: Res<WorldData>,
 ) {
     for (entity, mut transform, mut projectile) in projectiles.iter_mut() {
-        projectile.velocity *= 0.95;
-        transform.translation += projectile.velocity * time.delta_secs() * 500.0; // maybe mess around w this
-        transform.translation.y -= 100.0 * time.delta_secs(); // gravity
+        projectile.lifespan -= time.delta_secs();
+        if projectile.lifespan <= 0.0 {
+            commands.entity(entity).despawn();
+        }
+        if projectile.velocity.length_squared() > 0.0 {
+            projectile.velocity *= 0.995;
 
-        println!(
-            "pos: {:?} velocity: {}",
-            transform.translation,
-            projectile.velocity.length_squared()
-        );
+            projectile.velocity.y -= time.delta_secs() * 10.0;
+
+            let new_pos = transform.translation + projectile.velocity * time.delta_secs();
+
+            if let Some(hit) = ray_cast(
+                &world_data,
+                transform.translation,
+                projectile.velocity.normalize_or_zero(),
+                (new_pos - transform.translation).length() + 0.25,
+            ) {
+                transform.translation += hit.distance * projectile.velocity.normalize_or_zero();
+
+                projectile.velocity = Vec3::ZERO;
+            } else {
+                transform.translation = new_pos;
+
+                if projectile.velocity.length_squared() > 0.001 {
+                    projectile.direction = projectile.velocity.normalize();
+                }
+            }
+        }
     }
 }
 
 #[derive(Component)]
 pub struct Projectile {
+    pub direction: Vec3,
     pub velocity: Vec3,
+    pub lifespan: f32, // secs
 }
