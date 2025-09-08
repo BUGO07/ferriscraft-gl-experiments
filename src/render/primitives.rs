@@ -20,13 +20,13 @@ impl Vertex for PrimitiveVertex {
 pub struct Cuboid;
 
 impl Cuboid {
-    pub fn new(size: Vec3, pos_offset: Vec3) -> Vec<PrimitiveVertex> {
+    pub fn new(size: Vec3, offset: Vec3) -> Vec<PrimitiveVertex> {
         use super::Direction::*;
         let mut vertices = Vec::new();
         for dir in [Left, Right, Bottom, Top, Back, Front] {
             let quad = Quad::new(
                 dir,
-                (dir.as_ivec3().as_vec3().max(Vec3::ZERO) + pos_offset) * size,
+                (dir.as_ivec3().as_vec3().max(Vec3::ZERO) + offset) * size,
                 size,
             );
             for pos in quad {
