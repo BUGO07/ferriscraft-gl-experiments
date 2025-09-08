@@ -1,8 +1,35 @@
+use glfw::MouseButton;
+
 use crate::{
     CHUNK_SIZE,
     ecs::*,
-    ui::{DebugText, UIText},
+    ui::{Button, DebugText, UIRect, UIText},
 };
+
+pub fn handle_picking(
+    query: Query<&UIRect, With<Button>>,
+    mouse: Res<MouseInput>,
+    window: Res<Window>,
+) {
+    let mouse_pos = mouse.position / vec2(window.width as f32, window.height as f32);
+    let mouse_pos = vec2(mouse_pos.x * 2.0 - 1.0, 1.0 - mouse_pos.y * 2.0);
+    for button in query.iter() {
+        let pos = vec2(
+            button.x.calculate(window.width as f32) - 1.0,
+            1.0 - button.y.calculate(window.height as f32),
+        );
+        let size = vec2(
+            button.width.calculate(window.width as f32),
+            -button.height.calculate(window.height as f32),
+        );
+        if (pos.x..pos.x + size.x).contains(&mouse_pos.x)
+            && (pos.y + size.y..pos.y).contains(&mouse_pos.y)
+            && mouse.just_pressed(MouseButton::Left)
+        {
+            println!("pressed button")
+        }
+    }
+}
 
 pub fn update_ui(
     mut debug_text: Single<&mut UIText, With<DebugText>>,

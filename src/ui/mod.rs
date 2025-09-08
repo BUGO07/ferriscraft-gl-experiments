@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use gl::types::*;
 
 use crate::{
@@ -15,14 +13,17 @@ pub mod update;
 
 pub fn ui_plugin(app: &mut App) {
     app.add_systems(Startup, setup.after(crate::player::setup))
-        .add_systems(Update, update::update_ui);
+        .add_systems(Update, (update::update_ui, update::handle_picking));
 }
 
 #[derive(Component)]
 pub struct DebugText;
 
+#[derive(Component)]
+pub struct Button;
+
 fn setup(mut commands: Commands, mut materials: NonSendMut<Materials>) {
-    let material = materials.add(
+    let text_material = materials.add(
         Material::new(
             "text",
             MaterialOptions {
@@ -39,11 +40,42 @@ fn setup(mut commands: Commands, mut materials: NonSendMut<Materials>) {
             Val::Percent(0.0),
             Val::Px(6.0 * 3.0),
             Val::Px(10.0 * 3.0),
-            material,
+            text_material,
             "f3 or something".to_string(),
         ),
         DebugText,
     ));
+
+    let button_material = materials.add(
+        Material::new(
+            "button",
+            MaterialOptions {
+                base_color: Some(Vec4::new(0.0, 0.0, 1.0, 1.0)),
+                ..Default::default()
+            },
+        )
+        .unwrap(),
+    );
+
+    commands.spawn((
+        UIRect::new(
+            Val::Percent(80.0),
+            Val::Percent(80.0),
+            Val::Percent(10.0),
+            Val::Percent(5.0),
+            button_material,
+        ),
+        Button,
+    ));
+
+    commands.spawn((UIText::new(
+        Val::Percent(81.0),
+        Val::Percent(80.5),
+        Val::Px(6.0 * 3.0),
+        Val::Px(10.0 * 3.0),
+        text_material,
+        "Button".to_string(),
+    ),));
 
     // commands.spawn(UIRect::new(
     //     Val::Percent(50.0),
@@ -60,12 +92,12 @@ pub enum Val {
 }
 
 impl Val {
-    pub fn as_f32(&mut self) -> &mut f32 {
-        match self {
-            Val::Percent(p) => p,
-            Val::Px(p) => p,
-        }
-    }
+    // pub fn as_f32(&mut self) -> &mut f32 {
+    //     match self {
+    //         Val::Percent(p) => p,
+    //         Val::Px(p) => p,
+    //     }
+    // }
     pub fn calculate(&self, size: f32) -> f32 {
         match self {
             Val::Percent(p) => p / 100.0 * 2.0,
@@ -128,7 +160,7 @@ impl UIText {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct TextVertex {
-    pub position: [f32; 2],
+    pub pos: [f32; 2],
     pub char_id: u32,
     // size: [f32; 2],
 }

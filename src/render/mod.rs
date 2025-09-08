@@ -4,8 +4,12 @@ use crate::{
     App,
     ecs::*,
     player::Projectile,
-    render::{material::UniformValue, mesh::Mesh, primitives::Cuboid},
-    ui::{TextVertex, UIText},
+    render::{
+        material::UniformValue,
+        mesh::Mesh,
+        primitives::{Cuboid, PrimitiveVertex, Quad},
+    },
+    ui::{TextVertex, UIRect, UIText},
     utils::{should_cull_aabb, should_cull_sphere},
     world::mesher::Direction,
 };
@@ -204,7 +208,8 @@ fn render_skybox(vp: In<(Mat4, Mat4)>, materials: NonSend<Materials>, skybox: Re
 
 fn render_ui(
     materials: NonSend<Materials>,
-    query: Query<&UIText>,
+    text_query: Query<&UIText>,
+    rect_query: Query<&UIRect>,
     window: Res<Window>,
     #[cfg(debug_assertions)] mut debug_info: ResMut<DebugInfo>,
 ) {
@@ -220,7 +225,42 @@ fn render_ui(
         gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
     }
 
-    for ui_text in query.iter() {
+    for ui_rect in rect_query.iter() {
+        let material = &materials.0[ui_rect.material.0];
+
+        let quad = Quad::new(
+            Direction::Front,
+            vec3(
+                ui_rect.x.calculate(window_size.x) - 1.0,
+                1.0 - ui_rect.y.calculate(window_size.y),
+                0.0,
+            ),
+            vec3(
+                ui_rect.width.calculate(window_size.x),
+                -ui_rect.height.calculate(window_size.y),
+                0.0,
+            ),
+        );
+
+        let vertices = quad
+            .iter()
+            .map(|pos| PrimitiveVertex { pos: *pos })
+            .collect::<Vec<_>>();
+
+        if let Ok(mesh) = Mesh::new(&vertices, &Cuboid::generate_indices(vertices.len())) {
+            material.bind();
+
+            let _triangles = mesh.draw();
+
+            #[cfg(debug_assertions)]
+            {
+                debug_info.triangles += _triangles;
+                debug_info.draw_calls += 1;
+            }
+        }
+    }
+
+    for ui_text in text_query.iter() {
         let material = &materials.0[ui_text.material.0];
         let char_width = ui_text.font_size.calculate(window_size.x);
         let char_height = ui_text.font_height.calculate(window_size.y);
@@ -233,7 +273,7 @@ fn render_ui(
             for (char_index, character) in line.chars().enumerate() {
                 if let Some(i) = CHARACTERS.find(character) {
                     let vert = TextVertex {
-                        position: [base_x + char_index as f32 * char_width - 1.0, 1.0 - base_y],
+                        pos: [base_x + char_index as f32 * char_width - 1.0, 1.0 - base_y],
                         char_id: i as u32,
                     };
                     vertices.extend_from_slice(&[vert, vert, vert, vert]);
