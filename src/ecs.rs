@@ -159,6 +159,29 @@ pub struct Camera3d {
     pub far: f32,
 }
 
+impl Camera3d {
+    pub fn projection(&self, aspect_ratio: f32) -> Mat4 {
+        Mat4::perspective_rh_gl(self.fov.to_radians(), aspect_ratio, self.near, self.far)
+    }
+
+    pub fn frustum(&self, vp: Mat4) -> [Vec4; 6] {
+        let row1 = vp.row(0);
+        let row2 = vp.row(1);
+        let row3 = vp.row(2);
+        let row4 = vp.row(3);
+
+        // left right bottom top near far
+        [
+            row4 + row1,
+            row4 - row1,
+            row4 + row2,
+            row4 - row2,
+            row4 + row3,
+            row4 - row3,
+        ]
+    }
+}
+
 #[derive(Component)]
 pub struct DirectionalLight {
     pub illuminance: f32,

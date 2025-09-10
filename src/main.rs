@@ -108,6 +108,8 @@ fn main() {
     #[cfg(debug_assertions)]
     app.world.init_resource::<DebugInfo>();
 
+    app.world.init_resource::<GameSettings>();
+
     app.world.init_resource::<Time<UpdateTime>>();
     app.world.insert_resource(Time::<FixedTime> {
         delta: Duration::from_secs_f32(1.0 / 64.0),
@@ -185,4 +187,9 @@ fn main() {
 
     app.world.run_schedule(Exiting);
     app.world.clear_all();
+}
+
+#[derive(Resource, Default)]
+pub struct GameSettings {
+    pub wireframe: bool,
 }

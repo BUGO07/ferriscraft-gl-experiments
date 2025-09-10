@@ -1,6 +1,10 @@
-use glfw::{Action, WindowEvent};
+use glfw::{Action, Key, WindowEvent};
 
-use crate::{App, ecs::*};
+use crate::{
+    App, GameSettings,
+    ecs::*,
+    utils::{take_screenshot, toggle_fullscreen},
+};
 
 #[derive(Event)]
 pub struct WindowEventECS(pub WindowEvent);
@@ -10,10 +14,11 @@ pub fn window_plugin(app: &mut App) {
     app.world.init_resource::<KeyboardInput>();
     app.world.init_resource::<MouseInput>();
     app.add_systems(PreUpdate, handle_events)
+        .add_systems(Update, handle_keybinds)
         .add_systems(PostUpdate, (handle_input_cleanup, handle_window));
 }
 
-pub fn handle_events(
+fn handle_events(
     mut events: EventReader<WindowEventECS>,
     mut keyboard: ResMut<KeyboardInput>,
     mut mouse: ResMut<MouseInput>,
@@ -57,7 +62,22 @@ pub fn handle_events(
     }
 }
 
-pub fn handle_input_cleanup(mut keyboard: ResMut<KeyboardInput>, mut mouse: ResMut<MouseInput>) {
+fn handle_keybinds(
+    ns_window: NonSend<NSWindow>,
+    keyboard: Res<KeyboardInput>,
+    mut game_settings: ResMut<GameSettings>,
+) {
+    for key in keyboard.just_pressed.iter() {
+        match key {
+            Key::F1 => game_settings.wireframe = !game_settings.wireframe,
+            Key::F2 => take_screenshot(&ns_window.window),
+            Key::F11 => toggle_fullscreen(&ns_window.window),
+            _ => {}
+        }
+    }
+}
+
+fn handle_input_cleanup(mut keyboard: ResMut<KeyboardInput>, mut mouse: ResMut<MouseInput>) {
     keyboard.just_pressed.clear();
     keyboard.just_released.clear();
 
@@ -67,18 +87,7 @@ pub fn handle_input_cleanup(mut keyboard: ResMut<KeyboardInput>, mut mouse: ResM
     mouse.scroll = Vec2::ZERO;
 }
 
-pub fn handle_window(
-    mut ns_window: NonSendMut<NSWindow>,
-    mut window: ResMut<Window>,
-    mut not_first_run: Local<bool>,
-) {
-    if !*not_first_run {
-        // don't do anything on the first frame
-        // changing cursor visibility doesn't work on the first frame
-        *not_first_run = true;
-        return;
-    }
-    // idk
+fn handle_window(mut ns_window: NonSendMut<NSWindow>, mut window: ResMut<Window>) {
     if window.cursor_grab {
         ns_window.window.set_cursor_mode(glfw::CursorMode::Disabled);
     } else if window.cursor_visible {

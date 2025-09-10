@@ -13,6 +13,15 @@
 - Small UI Abstractions
 - Not Much Else
 
+## Controls
+`WASD/LShift/Space` - movement\
+`LControl` - sprint\
+`LMB/RMB` - place/break blocks\
+`C` - zoom\
+`F1` toggle wireframe\
+`F2` screenshot\
+`F11` toggle fullscreen\
+
 ## TODO
 - Actual UI
 - MultiPlayer

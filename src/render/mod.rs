@@ -2,7 +2,7 @@ use gl::types::*;
 use glfw::Context;
 
 use crate::{
-    App,
+    App, GameSettings,
     ecs::*,
     player::Projectile,
     render::{
@@ -56,7 +56,6 @@ pub fn render_plugin(app: &mut App) {
                 .pipe(render_skybox)
                 .pipe(render_ui),
         )
-        .add_systems(RenderUpdate, handle_debug_keys)
         .add_systems(PostRenderUpdate, finish_up);
 }
 
@@ -152,32 +151,10 @@ fn calculations(
 ) -> (Mat4, Mat4, [Vec4; 6]) {
     let (camera_transform, camera) = query.into_inner();
 
-    let projection = Mat4::perspective_rh_gl(
-        camera.fov.to_radians(),
-        window.width as f32 / window.height as f32,
-        camera.near,
-        camera.far,
-    );
-
+    let projection = camera.projection(window.width as f32 / window.height as f32);
     let view = camera_transform.as_mat4().inverse();
+    let frustum = camera.frustum(projection * view);
 
-    let frustum = {
-        let vp = projection * view;
-        let row1 = vp.row(0);
-        let row2 = vp.row(1);
-        let row3 = vp.row(2);
-        let row4 = vp.row(3);
-
-        // left right bottom top near far
-        [
-            row4 + row1,
-            row4 - row1,
-            row4 + row2,
-            row4 - row2,
-            row4 + row3,
-            row4 - row3,
-        ]
-    };
     (projection, view, frustum)
 }
 
@@ -187,6 +164,7 @@ fn render_world(
     materials: NonSend<Materials>,
     mesh_entities: Query<(&Transform, &Mesh3d, &MeshMaterial, &Aabb), Without<DirectionalLight>>,
     light_query: Single<(&Transform, &DirectionalLight)>,
+    game_settings: Res<GameSettings>,
     #[cfg(debug_assertions)] mut debug_info: ResMut<DebugInfo>,
 ) -> (Mat4, Mat4, [Vec4; 6]) {
     let (light_transform, light) = light_query.into_inner();
@@ -199,6 +177,10 @@ fn render_world(
         gl::CullFace(gl::BACK);
         gl::ClearColor(0.44, 0.73, 0.88, 1.0);
         gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+
+        if game_settings.wireframe {
+            gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE);
+        }
     }
 
     // main pass
@@ -249,6 +231,7 @@ fn render_projectiles(
     vp: In<(Mat4, Mat4, [Vec4; 6])>,
     materials: NonSend<Materials>,
     query: Query<(&Transform, &Projectile), Without<Camera3d>>,
+    game_settings: Res<GameSettings>,
     #[cfg(debug_assertions)] mut debug_info: ResMut<DebugInfo>,
 ) -> (Mat4, Mat4) {
     unsafe {
@@ -287,6 +270,12 @@ fn render_projectiles(
         {
             debug_info.triangles += _triangles;
             debug_info.draw_calls += 1;
+        }
+    }
+
+    unsafe {
+        if game_settings.wireframe {
+            gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL);
         }
     }
 
@@ -407,19 +396,6 @@ fn render_ui(
                 debug_info.triangles += _triangles;
                 debug_info.draw_calls += 1;
             }
-        }
-    }
-}
-
-pub fn handle_debug_keys(
-    _: NonSend<NSWindow>, // to run on the main thread
-    keyboard: Res<KeyboardInput>,
-    mut is_wireframe: Local<bool>,
-) {
-    unsafe {
-        if keyboard.just_pressed(glfw::Key::F1) {
-            *is_wireframe = !*is_wireframe;
-            gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL - *is_wireframe as GLenum);
         }
     }
 }

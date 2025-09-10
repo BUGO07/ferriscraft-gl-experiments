@@ -18,6 +18,7 @@ strip = true
 [dependencies]
 bevy_ecs = { version = "0.16.1", features = ["multi_threaded"] }
 bevy_tasks = "*"
+chrono = "0.4.42"
 gl = "0.14.0"
 glam = "0.30.5"
 glfw = "0.60.0"
