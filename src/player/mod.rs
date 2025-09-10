@@ -3,7 +3,6 @@ use glfw::MouseButton;
 use crate::{
     App, CHUNK_SIZE, SEA_LEVEL,
     ecs::*,
-    render::material::{Material, MaterialOptions},
     utils::set_cursor_grab,
     world::{
         ChunkMarker, NoiseFunctions, WorldData,
@@ -20,12 +19,7 @@ pub fn player_plugin(app: &mut App) {
         .add_systems(FixedUpdate, update_projectiles);
 }
 
-pub fn setup(
-    mut commands: Commands,
-    mut materials: NonSendMut<Materials>,
-    mut window: ResMut<Window>,
-    noises: Res<NoiseFunctions>,
-) {
+pub fn setup(mut commands: Commands, mut window: ResMut<Window>, noises: Res<NoiseFunctions>) {
     set_cursor_grab(&mut window, true);
     let (height, _biome) = terrain_noise(vec2(0.0, 0.0), &noises);
     commands.spawn((
@@ -46,30 +40,6 @@ pub fn setup(
                 * Quat::from_rotation_y(-30_f32.to_radians()),
         ),
     ));
-
-    // materials[0]
-    materials.add(
-        Material::new(
-            "voxel",
-            MaterialOptions {
-                base_texture: Some("assets/atlas.png"),
-                ..Default::default()
-            },
-        )
-        .unwrap(),
-    );
-
-    // plrimitive
-    materials.add(
-        Material::new(
-            "primitive",
-            MaterialOptions {
-                base_color: Some(Vec4::new(0.8, 0.8, 0.8, 1.0)),
-                ..Default::default()
-            },
-        )
-        .unwrap(),
-    );
 }
 
 fn handle_interactions(

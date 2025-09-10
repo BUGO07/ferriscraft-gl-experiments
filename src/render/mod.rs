@@ -1,3 +1,4 @@
+use gl::types::*;
 use glfw::Context;
 
 use crate::{
@@ -5,7 +6,7 @@ use crate::{
     ecs::*,
     player::Projectile,
     render::{
-        material::UniformValue,
+        material::{Material, MaterialOptions, UniformValue},
         mesh::Mesh,
         primitives::{Cuboid, PrimitiveVertex, Quad},
     },
@@ -19,8 +20,33 @@ pub mod mesh;
 pub mod primitives;
 
 pub fn render_plugin(app: &mut App) {
+    let mut materials = Materials::default();
+
+    // materials[0] // voxel
+    materials.add(
+        Material::new(
+            "voxel",
+            MaterialOptions {
+                base_texture: Some("assets/atlas.png"),
+                ..Default::default()
+            },
+        )
+        .unwrap(),
+    );
+
+    // materials[1] // primitive
+    materials.add(
+        Material::new(
+            "primitive",
+            MaterialOptions {
+                base_color: Some(Vec4::new(0.8, 0.8, 0.8, 1.0)),
+                ..Default::default()
+            },
+        )
+        .unwrap(),
+    );
     app.init_resource::<Meshes>()
-        .init_non_send_resource::<Materials>()
+        .insert_non_send_resource(materials)
         .add_systems(Startup, setup)
         .add_systems(
             RenderUpdate,
@@ -33,7 +59,91 @@ pub fn render_plugin(app: &mut App) {
         .add_systems(PostRenderUpdate, finish_up);
 }
 
-fn setup() {}
+fn setup(mut commands: Commands, mut materials: NonSendMut<Materials>) {
+    let mut texture_id: GLuint = 0;
+    let mut vao: GLuint = 0;
+    let mut vbo: GLuint = 0;
+
+    unsafe {
+        gl::GenBuffers(1, &mut vbo);
+
+        gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+        gl::BufferData(
+            gl::ARRAY_BUFFER,
+            size_of_val(CUBEMAP_VERTICES) as isize,
+            CUBEMAP_VERTICES.as_ptr() as *const _,
+            gl::STATIC_DRAW,
+        );
+
+        gl::GenVertexArrays(1, &mut vao);
+
+        gl::BindVertexArray(vao);
+        gl::VertexAttribPointer(
+            0,
+            3,
+            gl::FLOAT,
+            gl::FALSE,
+            3 * size_of::<GLfloat>() as GLint,
+            std::ptr::null(),
+        );
+        gl::EnableVertexAttribArray(0);
+
+        gl::GenTextures(1, &mut texture_id);
+        gl::BindTexture(gl::TEXTURE_CUBE_MAP, texture_id);
+        for i in 0..6 {
+            let img = image::open(format!("assets/skybox/face{}.png", i)).unwrap();
+
+            gl::TexImage2D(
+                gl::TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                0,
+                gl::RGB as GLint,
+                img.width() as GLint,
+                img.height() as GLint,
+                0,
+                gl::RGB,
+                gl::UNSIGNED_BYTE,
+                img.to_rgb8().into_raw().as_ptr() as *const _,
+            );
+        }
+
+        gl::TexParameteri(
+            gl::TEXTURE_CUBE_MAP,
+            gl::TEXTURE_MIN_FILTER,
+            gl::LINEAR as GLint,
+        );
+        gl::TexParameteri(
+            gl::TEXTURE_CUBE_MAP,
+            gl::TEXTURE_MAG_FILTER,
+            gl::LINEAR as GLint,
+        );
+        gl::TexParameteri(
+            gl::TEXTURE_CUBE_MAP,
+            gl::TEXTURE_WRAP_S,
+            gl::CLAMP_TO_EDGE as GLint,
+        );
+        gl::TexParameteri(
+            gl::TEXTURE_CUBE_MAP,
+            gl::TEXTURE_WRAP_T,
+            gl::CLAMP_TO_EDGE as GLint,
+        );
+        gl::TexParameteri(
+            gl::TEXTURE_CUBE_MAP,
+            gl::TEXTURE_WRAP_R,
+            gl::CLAMP_TO_EDGE as GLint,
+        );
+    }
+
+    let material_id = materials
+        .add(Material::new("skybox", MaterialOptions::default()).unwrap())
+        .0;
+
+    commands.insert_resource(Skybox {
+        material_id,
+        texture_id,
+        vao,
+        vbo,
+    });
+}
 
 fn calculations(
     query: Single<(&mut Transform, &Camera3d)>,

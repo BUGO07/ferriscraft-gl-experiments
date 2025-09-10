@@ -2,18 +2,10 @@ use std::time::{Duration, Instant};
 
 use bevy_ecs::system::ScheduleSystem;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
-use gl::types::*;
 use glam::*;
 use glfw::Context;
 
-use crate::{
-    ecs::*,
-    render::{
-        CUBEMAP_VERTICES,
-        material::{Material, MaterialOptions},
-    },
-    window::WindowEventECS,
-};
+use crate::{ecs::*, window::WindowEventECS};
 
 const CHUNK_SIZE: i32 = 32;
 const SEA_LEVEL: i32 = 64;
@@ -34,18 +26,22 @@ pub struct App {
     last_update: Instant,
 }
 
+#[allow(dead_code)]
 impl App {
     fn init_resource<R: Resource + Default>(&mut self) -> &mut Self {
         self.world.init_resource::<R>();
         self
     }
-    #[allow(dead_code)]
     fn insert_resource<R: Resource>(&mut self, resource: R) -> &mut Self {
         self.world.insert_resource(resource);
         self
     }
     fn init_non_send_resource<R: Default + 'static>(&mut self) -> &mut Self {
         self.world.init_non_send_resource::<R>();
+        self
+    }
+    fn insert_non_send_resource<R: 'static>(&mut self, resource: R) -> &mut Self {
+        self.world.insert_non_send_resource(resource);
         self
     }
     fn add_systems<M>(
@@ -141,8 +137,6 @@ fn main() {
 
     app.world.run_schedule(Startup);
 
-    load_skybox(&mut app.world);
-
     while !app
         .world
         .non_send_resource::<NSWindow>()
@@ -191,96 +185,4 @@ fn main() {
 
     app.world.run_schedule(Exiting);
     app.world.clear_all();
-}
-
-fn load_skybox(world: &mut World) {
-    let mut texture_id: GLuint = 0;
-    let mut vao: GLuint = 0;
-    let mut vbo: GLuint = 0;
-
-    unsafe {
-        gl::GenBuffers(1, &mut vbo);
-
-        gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
-        gl::BufferData(
-            gl::ARRAY_BUFFER,
-            size_of_val(CUBEMAP_VERTICES) as isize,
-            CUBEMAP_VERTICES.as_ptr() as *const _,
-            gl::STATIC_DRAW,
-        );
-
-        gl::GenVertexArrays(1, &mut vao);
-
-        gl::BindVertexArray(vao);
-        gl::VertexAttribPointer(
-            0,
-            3,
-            gl::FLOAT,
-            gl::FALSE,
-            3 * size_of::<GLfloat>() as GLint,
-            std::ptr::null(),
-        );
-        gl::EnableVertexAttribArray(0);
-
-        gl::GenTextures(1, &mut texture_id);
-        gl::BindTexture(gl::TEXTURE_CUBE_MAP, texture_id);
-        for (i, &face) in ["face0", "face1", "face2", "face3", "face4", "face5"]
-            .iter()
-            .enumerate()
-        {
-            let img = image::open(format!("assets/skybox/{}.png", face)).unwrap();
-            let width = img.width() as GLint;
-            let height = img.height() as GLint;
-            let raw_data = &img.to_rgb8().into_raw();
-
-            gl::TexImage2D(
-                gl::TEXTURE_CUBE_MAP_POSITIVE_X + i as GLuint,
-                0,
-                gl::RGB as GLint,
-                width,
-                height,
-                0,
-                gl::RGB,
-                gl::UNSIGNED_BYTE,
-                raw_data.as_ptr() as *const _,
-            );
-        }
-
-        gl::TexParameteri(
-            gl::TEXTURE_CUBE_MAP,
-            gl::TEXTURE_MIN_FILTER,
-            gl::LINEAR as GLint,
-        );
-        gl::TexParameteri(
-            gl::TEXTURE_CUBE_MAP,
-            gl::TEXTURE_MAG_FILTER,
-            gl::LINEAR as GLint,
-        );
-        gl::TexParameteri(
-            gl::TEXTURE_CUBE_MAP,
-            gl::TEXTURE_WRAP_S,
-            gl::CLAMP_TO_EDGE as GLint,
-        );
-        gl::TexParameteri(
-            gl::TEXTURE_CUBE_MAP,
-            gl::TEXTURE_WRAP_T,
-            gl::CLAMP_TO_EDGE as GLint,
-        );
-        gl::TexParameteri(
-            gl::TEXTURE_CUBE_MAP,
-            gl::TEXTURE_WRAP_R,
-            gl::CLAMP_TO_EDGE as GLint,
-        );
-    }
-
-    let material_id = world
-        .non_send_resource_mut::<Materials>()
-        .add(Material::new("skybox", MaterialOptions::default()).unwrap())
-        .0;
-    world.insert_resource(Skybox {
-        material_id,
-        texture_id,
-        vao,
-        vbo,
-    });
 }
