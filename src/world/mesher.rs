@@ -69,9 +69,7 @@ impl Direction {
 }
 
 #[repr(C)]
-pub struct VoxelVertex {
-    vert_data: u32,
-}
+pub struct VoxelVertex(u32);
 
 impl Vertex for VoxelVertex {
     fn attributes() -> &'static [(GLuint, GLint, GLenum, GLboolean, usize)] {
@@ -186,14 +184,14 @@ impl ChunkMesh {
                 ao_count = 3;
             }
 
-            self.vertices.push(VoxelVertex {
-                vert_data: pos[0] as u32
+            self.vertices.push(VoxelVertex(
+                pos[0] as u32
                     | (pos[1] as u32) << 6
                     | (pos[2] as u32) << 12
                     | (dir as u32) << 18
                     | (ao_count as u32) << 21
                     | (block as u32) << 23,
-            });
+            ));
         }
     }
 }

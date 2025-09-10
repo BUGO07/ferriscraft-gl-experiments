@@ -56,6 +56,7 @@ pub fn render_plugin(app: &mut App) {
                 .pipe(render_skybox)
                 .pipe(render_ui),
         )
+        .add_systems(RenderUpdate, handle_debug_keys)
         .add_systems(PostRenderUpdate, finish_up);
 }
 
@@ -406,6 +407,19 @@ fn render_ui(
                 debug_info.triangles += _triangles;
                 debug_info.draw_calls += 1;
             }
+        }
+    }
+}
+
+pub fn handle_debug_keys(
+    _: NonSend<NSWindow>, // to run on the main thread
+    keyboard: Res<KeyboardInput>,
+    mut is_wireframe: Local<bool>,
+) {
+    unsafe {
+        if keyboard.just_pressed(glfw::Key::F1) {
+            *is_wireframe = !*is_wireframe;
+            gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL - *is_wireframe as GLenum);
         }
     }
 }

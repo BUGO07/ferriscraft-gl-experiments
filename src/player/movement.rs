@@ -19,6 +19,7 @@ pub fn handle_movement(
     }
 
     let mut move_dir = Vec3::ZERO;
+    let mut speed = 25.0;
 
     let local_z = camera.rotation * Vec3::Z;
     let forward = -Vec3::new(local_z.x, 0.0, local_z.z).normalize_or_zero();
@@ -42,6 +43,9 @@ pub fn handle_movement(
     if keyboard.pressed(Key::LeftShift) {
         move_dir -= Vec3::Y;
     }
+    if keyboard.pressed(Key::LeftControl) {
+        speed *= 10.0;
+    }
 
     let (mut yaw, mut pitch, _) = camera.rotation.to_euler(EulerRot::YXZ);
     let window_scale = window.height.max(window.width) as f32;
@@ -53,5 +57,5 @@ pub fn handle_movement(
 
     camera.rotation = Quat::from_rotation_y(yaw) * Quat::from_rotation_x(pitch);
 
-    camera.translation += move_dir.normalize_or_zero() * 50.0 * time.delta_secs();
+    camera.translation += move_dir.normalize_or_zero() * speed * time.delta_secs();
 }
