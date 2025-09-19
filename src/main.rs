@@ -5,7 +5,7 @@ use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use glam::*;
 use glfw::Context;
 
-use crate::{ecs::*, window::WindowEventECS};
+use crate::{ecs::*, utils::SECS_IN_DAY, window::WindowEventECS};
 
 const CHUNK_SIZE: i32 = 32;
 const SEA_LEVEL: i32 = 64;
@@ -110,7 +110,12 @@ fn main() {
 
     app.world.init_resource::<GameSettings>();
 
-    app.world.init_resource::<Time<UpdateTime>>();
+    app.world.insert_resource(Time::<UpdateTime> {
+        extra: UpdateTime {
+            simulated: SECS_IN_DAY / 24.0 * 9.0,
+        },
+        ..Default::default()
+    });
     app.world.insert_resource(Time::<FixedTime> {
         delta: Duration::from_secs_f32(1.0 / 64.0),
         ..Default::default()
@@ -152,6 +157,7 @@ fn main() {
             .extra
             .accumulator += delta;
         let mut time = app.world.resource_mut::<Time>();
+        time.extra.simulated = (time.extra.simulated + delta.as_secs_f32() * 72.0) % SECS_IN_DAY;
         time.delta = delta;
         time.elapsed += delta.as_secs_f64();
         app.last_update = now;
@@ -192,4 +198,5 @@ fn main() {
 #[derive(Resource, Default)]
 pub struct GameSettings {
     pub wireframe: bool,
+    pub time: f32, // seconds from 0.0 - SECS_IN_DAY
 }

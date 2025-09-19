@@ -9,6 +9,8 @@ use crate::{
     world::mesher::Block,
 };
 
+pub const SECS_IN_DAY: f32 = 86400.0;
+
 #[inline]
 pub fn set_cursor_grab(window: &mut Window, val: bool) {
     window.cursor_grab = val;

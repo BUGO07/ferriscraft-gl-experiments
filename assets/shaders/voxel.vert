@@ -1,5 +1,7 @@
 #version 330 core
 
+#include common.glsl
+
 layout(location = 0) in uint vertex_data;
 
 out vec3 v_pos;
@@ -12,19 +14,6 @@ flat out uint v_block_id;
 uniform mat4 projection;
 uniform mat4 view;
 uniform mat4 model;
-
-const float ATLAS_SIZE_X = 3.0; 
-const float ATLAS_SIZE_Y = 10.0;
-
-const vec3 normals[6] = vec3[6](
-    vec3(-1.0, 0.0, 0.0), 
-    vec3(1.0, 0.0, 0.0), 
-    vec3(0.0,-1.0, 0.0), 
-    vec3(0.0, 1.0, 0.0), 
-    vec3(0.0, 0.0,-1.0), 
-    vec3(0.0, 0.0, 1.0));
-
-const vec4 ambient_lerps = vec4(1.0,0.7,0.5,0.15);
 
 vec2 get_uv(int normal, int block_id) {
     float face_idx = 1.0;
@@ -61,6 +50,6 @@ void main() {
     v_pos = gl_Position.xyz / gl_Position.w;
     v_normal = normalize(transpose(inverse(mat3(modelview))) * n);
     v_block_id = block_id;
-    v_ao = ambient_lerps[ao];
+    v_ao = ao_values[ao];
     v_uv = get_uv(int(normal), int(block_id));
 }

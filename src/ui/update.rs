@@ -73,7 +73,7 @@ pub fn update_ui(
     }
 
     debug_text.text = format!(
-        "FPS:    {}\nXYZ:    {:.2}\nChunk:  {:.2}\nBlock:  {:.2}\nFacing: {} / {}'/ {}'",
+        "FPS:    {}\nXYZ:    {:.2}\nChunk:  {:.2}\nBlock:  {:.2}\nFacing: {} / {}'/ {}'\nTime: {}",
         *lf,
         pt,
         chunk_pos,
@@ -81,5 +81,8 @@ pub fn update_ui(
         facing,
         -yaw.to_degrees() as i32,
         -pitch.to_degrees() as i32,
+        chrono::NaiveTime::from_num_seconds_from_midnight_opt(time.extra.simulated as u32, 0)
+            .unwrap()
+            .format("%H:%M")
     )
 }

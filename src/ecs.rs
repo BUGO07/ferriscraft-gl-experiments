@@ -53,7 +53,10 @@ impl<T> Time<T> {
 }
 
 #[derive(Default)]
-pub struct UpdateTime;
+pub struct UpdateTime {
+    pub simulated: f32,
+}
+
 #[derive(Default)]
 pub struct FixedTime {
     pub accumulator: Duration,

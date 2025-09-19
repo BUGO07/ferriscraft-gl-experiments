@@ -152,7 +152,21 @@ impl Material {
 
 fn compile_shader(source: &str, shader_type: GLuint) -> Result<GLuint, String> {
     unsafe {
-        let c_str = CString::new(source).unwrap();
+        let mut processed = String::new();
+        for line in source.lines() {
+            if line.starts_with("#include") {
+                let shader = line.replace("#include ", "");
+                processed.push_str(
+                    &std::fs::read_to_string(format!("assets/shaders/include/{shader}"))
+                        .map_err(|_| format!("could not read included {shader} shader"))?,
+                );
+            } else {
+                processed.push_str(line);
+            }
+            processed.push('\n');
+        }
+
+        let c_str = CString::new(processed).unwrap();
         let shader = gl::CreateShader(shader_type);
         gl::ShaderSource(shader, 1, &c_str.as_ptr(), null());
         gl::CompileShader(shader);

@@ -282,8 +282,14 @@ fn render_projectiles(
     (projection, view)
 }
 
-fn render_skybox(vp: In<(Mat4, Mat4)>, materials: NonSend<Materials>, skybox: Res<Skybox>) {
+fn render_skybox(
+    vp: In<(Mat4, Mat4)>,
+    materials: NonSend<Materials>,
+    skybox: Res<Skybox>,
+    time: Res<Time>,
+) {
     let (projection, view) = *vp;
+
     unsafe {
         gl::DepthMask(gl::FALSE);
         gl::DepthFunc(gl::LEQUAL);
@@ -291,10 +297,8 @@ fn render_skybox(vp: In<(Mat4, Mat4)>, materials: NonSend<Materials>, skybox: Re
         let material = &materials.0[skybox.material_id];
         material.bind();
         material.set_uniform(c"projection", UniformValue::Mat4(projection));
-        material.set_uniform(
-            c"view",
-            UniformValue::Mat4(Mat4::from_quat(view.to_scale_rotation_translation().1)),
-        );
+        material.set_uniform(c"view", UniformValue::Mat4(view));
+        material.set_uniform(c"time", UniformValue::Float(time.extra.simulated));
 
         gl::BindVertexArray(skybox.vao);
         gl::BindTexture(gl::TEXTURE_CUBE_MAP, skybox.texture_id);
