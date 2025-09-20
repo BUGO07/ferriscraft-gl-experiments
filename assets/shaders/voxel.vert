@@ -43,12 +43,11 @@ void main() {
     uint block_id = (vertex_data >> 23) & 63u;
 
     vec3 n = normals[int(normal)];
-    mat4 modelview = view * model;
 
-    gl_Position = projection * modelview * vec4(pos, 1.0);
+    gl_Position = projection * view * model * vec4(pos, 1.0);
 
-    v_pos = gl_Position.xyz / gl_Position.w;
-    v_normal = normalize(transpose(inverse(mat3(modelview))) * n);
+    v_pos = (model * vec4(pos, 1.0)).xyz;
+    v_normal = normalize(transpose(inverse(mat3(model))) * n);
     v_block_id = block_id;
     v_ao = ao_values[ao];
     v_uv = get_uv(int(normal), int(block_id));

@@ -162,12 +162,12 @@ fn render_world(
     vp: In<(Mat4, Mat4, [Vec4; 6])>,
     meshes: Res<Meshes>,
     materials: NonSend<Materials>,
-    mesh_entities: Query<(&Transform, &Mesh3d, &MeshMaterial, &Aabb), Without<DirectionalLight>>,
-    light_query: Single<(&Transform, &DirectionalLight)>,
+    mesh_entities: Query<(&Transform, &Mesh3d, &MeshMaterial, &Aabb)>,
+    light: Single<&DirectionalLight>,
     game_settings: Res<GameSettings>,
+    time: Res<Time>,
     #[cfg(debug_assertions)] mut debug_info: ResMut<DebugInfo>,
 ) -> (Mat4, Mat4, [Vec4; 6]) {
-    let (light_transform, light) = light_query.into_inner();
     let (projection, view, frustum) = *vp;
 
     unsafe {
@@ -201,15 +201,8 @@ fn render_world(
             material.set_uniform(c"projection", UniformValue::Mat4(projection));
             material.set_uniform(c"view", UniformValue::Mat4(view));
             material.set_uniform(c"model", UniformValue::Mat4(chunk_transform.as_mat4()));
-            material.set_uniform(
-                c"u_light",
-                UniformValue::Vec4(
-                    (view * Mat4::from_quat(light_transform.rotation) * Vec4::NEG_Z)
-                        .truncate()
-                        .normalize()
-                        .extend(light.illuminance),
-                ),
-            );
+            material.set_uniform(c"u_light", UniformValue::Float(light.illuminance));
+            material.set_uniform(c"time", UniformValue::Float(time.extra.simulated));
 
             let _triangles = mesh.draw();
 

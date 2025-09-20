@@ -43,3 +43,25 @@ mat4 rotate_y(float angle) {
         -s, 0.0, c, 0.0,
         0.0, 0.0, 0.0, 1.0);
 }
+
+mat4 rotate_x(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+
+    return mat4(
+        1.0, 0.0, 0.0, 0.0,
+        0.0, c, -s, 0.0,
+        0.0, s, c, 0.0,
+        0.0, 0.0, 0.0, 1.0);
+}
+
+mat4 rotate_z(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+
+    return mat4(
+        c, -s, 0.0, 0.0,
+        s, c, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0);
+}

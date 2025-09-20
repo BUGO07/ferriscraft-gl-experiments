@@ -31,15 +31,9 @@ pub fn setup(mut commands: Commands, mut window: ResMut<Window>, noises: Res<Noi
         Transform::from_xyz(0.0, height.max(SEA_LEVEL) as f32 + 5.0, 0.0),
     ));
 
-    commands.spawn((
-        DirectionalLight {
-            illuminance: 1000.0,
-        },
-        Transform::DEFAULT.with_rotation(
-            Quat::from_rotation_x(45_f32.to_radians())
-                * Quat::from_rotation_y(-30_f32.to_radians()),
-        ),
-    ));
+    commands.spawn(DirectionalLight {
+        illuminance: 1000.0,
+    });
 }
 
 fn handle_interactions(
