@@ -155,6 +155,9 @@ impl Aabb {
     }
 }
 
+#[derive(Component, Default)]
+pub struct Velocity(pub Vec3);
+
 #[derive(Component)]
 pub struct Camera3d {
     pub fov: f32,

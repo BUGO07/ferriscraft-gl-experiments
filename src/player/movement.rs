@@ -3,13 +3,13 @@ use glfw::Key;
 use crate::{ecs::*, utils::set_cursor_grab};
 
 pub fn handle_movement(
-    camera: Single<(&mut Transform, &mut Camera3d)>,
+    camera: Single<(&mut Transform, &mut Camera3d, &mut Velocity)>,
     keyboard: Res<KeyboardInput>,
     mouse: Res<MouseInput>,
     time: Res<Time>,
     mut window: ResMut<Window>,
 ) {
-    let (mut transform, mut camera) = camera.into_inner();
+    let (mut transform, mut camera, mut velocity) = camera.into_inner();
     if keyboard.just_pressed(Key::Escape) {
         let grab = window.cursor_visible;
         set_cursor_grab(&mut window, grab);
@@ -61,5 +61,6 @@ pub fn handle_movement(
 
     transform.rotation = Quat::from_rotation_y(yaw) * Quat::from_rotation_x(pitch);
 
-    transform.translation += move_dir.normalize_or_zero() * speed * time.delta_secs();
+    velocity.0 = move_dir.normalize_or_zero() * speed;
+    transform.translation += velocity.0 * time.delta_secs();
 }

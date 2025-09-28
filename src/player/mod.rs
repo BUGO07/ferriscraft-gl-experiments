@@ -28,6 +28,7 @@ pub fn setup(mut commands: Commands, mut window: ResMut<Window>, noises: Res<Noi
             near: 0.1,
             far: 1024.0,
         },
+        Velocity::default(),
         Transform::from_xyz(0.0, height.max(SEA_LEVEL) as f32 + 5.0, 0.0),
     ));
 
@@ -38,15 +39,16 @@ pub fn setup(mut commands: Commands, mut window: ResMut<Window>, noises: Res<Noi
 
 fn handle_interactions(
     mut commands: Commands,
-    player: Single<&Transform, With<Camera3d>>,
+    player: Single<(&Transform, &Velocity), With<Camera3d>>,
     mouse: Res<MouseInput>,
     chunks: Query<(Entity, &Transform), With<ChunkMarker>>,
     mut world_data: ResMut<WorldData>,
 ) {
+    let (transform, velocity) = player.into_inner();
     if let Some(hit) = ray_cast(
         &world_data,
-        player.translation,
-        player.rotation * Vec3::NEG_Z, // == player.forward()
+        transform.translation,
+        transform.rotation * Vec3::NEG_Z, // == player.forward()
         5.0,
     ) {
         world_data.highlighted_block = Some(hit.global_position);
@@ -98,15 +100,15 @@ fn handle_interactions(
         world_data.highlighted_block = None;
 
         if mouse.just_pressed(MouseButton::Right) {
-            let direction = player.rotation * Vec3::NEG_Z;
+            let direction = transform.rotation * Vec3::NEG_Z;
             let speed = 50.0; // TODO change between 35-50 depending on how long the right click was held
             commands.spawn((
                 Projectile {
                     direction,
-                    velocity: direction * speed,
+                    velocity: direction * speed + velocity.0,
                     lifespan: 60.0,
                 },
-                Transform::from_translation(player.translation),
+                Transform::from_translation(transform.translation),
             ));
         }
     }
