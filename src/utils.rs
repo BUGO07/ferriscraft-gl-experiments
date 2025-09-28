@@ -108,7 +108,7 @@ pub fn should_cull_sphere(frustum: &[Vec4; 6], pos: Vec3, radius: f32) -> bool {
 pub fn take_screenshot(window: &PWindow) {
     unsafe {
         let (width, height) = window.get_framebuffer_size();
-        let size = (3 * width * height) as usize;
+        let size = (4 * width * height) as usize;
         let layout = Layout::from_size_align(size, 0x8).unwrap();
         let pixels = std::alloc::alloc(layout);
 
@@ -117,13 +117,13 @@ pub fn take_screenshot(window: &PWindow) {
             0,
             width,
             height,
-            gl::RGB,
+            gl::RGBA,
             gl::UNSIGNED_BYTE,
             pixels as *mut _,
         );
 
         let img = image::imageops::flip_vertical(
-            &image::RgbImage::from_raw(
+            &image::RgbaImage::from_raw(
                 width as u32,
                 height as u32,
                 Vec::from_raw_parts(pixels, size, size),
@@ -143,7 +143,7 @@ pub fn take_screenshot(window: &PWindow) {
             &img,
             width as u32,
             height as u32,
-            image::ColorType::Rgb8,
+            image::ColorType::Rgba8,
         )
         .expect("couldn't save to disk");
     }
