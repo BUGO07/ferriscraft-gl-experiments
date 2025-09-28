@@ -41,7 +41,7 @@ fn handle_interactions(
     player: Single<&Transform, With<Camera3d>>,
     mouse: Res<MouseInput>,
     chunks: Query<(Entity, &Transform), With<ChunkMarker>>,
-    world_data: Res<WorldData>,
+    mut world_data: ResMut<WorldData>,
 ) {
     if let Some(hit) = ray_cast(
         &world_data,
@@ -49,6 +49,7 @@ fn handle_interactions(
         player.rotation * Vec3::NEG_Z, // == player.forward()
         5.0,
     ) {
+        world_data.highlighted_block = Some(hit.global_position);
         let mut local_pos = hit.local_pos;
         let mut chunk_pos = hit.chunk_pos;
         if mouse.just_pressed(MouseButton::Left)
@@ -93,17 +94,21 @@ fn handle_interactions(
                 );
             }
         }
-    } else if mouse.just_pressed(MouseButton::Right) {
-        let direction = player.rotation * Vec3::NEG_Z;
-        let speed = 50.0; // TODO change between 35-50 depending on how long the right click was held
-        commands.spawn((
-            Projectile {
-                direction,
-                velocity: direction * speed,
-                lifespan: 60.0,
-            },
-            Transform::from_translation(player.translation),
-        ));
+    } else {
+        world_data.highlighted_block = None;
+
+        if mouse.just_pressed(MouseButton::Right) {
+            let direction = player.rotation * Vec3::NEG_Z;
+            let speed = 50.0; // TODO change between 35-50 depending on how long the right click was held
+            commands.spawn((
+                Projectile {
+                    direction,
+                    velocity: direction * speed,
+                    lifespan: 60.0,
+                },
+                Transform::from_translation(player.translation),
+            ));
+        }
     }
 }
 

@@ -12,7 +12,7 @@ use crate::{
     },
     ui::{TextVertex, UIRect, UIText},
     utils::{should_cull_aabb, should_cull_sphere},
-    world::mesher::Direction,
+    world::{WorldData, mesher::Direction},
 };
 
 pub mod material;
@@ -158,6 +158,7 @@ fn calculations(
     (projection, view, frustum)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_world(
     vp: In<(Mat4, Mat4, [Vec4; 6])>,
     meshes: Res<Meshes>,
@@ -166,6 +167,7 @@ fn render_world(
     light: Single<&DirectionalLight>,
     game_settings: Res<GameSettings>,
     time: Res<Time>,
+    world_data: Res<WorldData>,
     #[cfg(debug_assertions)] mut debug_info: ResMut<DebugInfo>,
 ) -> (Mat4, Mat4, [Vec4; 6]) {
     let (projection, view, frustum) = *vp;
@@ -177,6 +179,35 @@ fn render_world(
         gl::CullFace(gl::BACK);
         gl::ClearColor(0.44, 0.73, 0.88, 1.0);
         gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+
+        if let Some(pos) = world_data.highlighted_block {
+            gl::LineWidth(3.0);
+
+            let vertices = Cuboid::new(Vec3::ONE, Vec3::ZERO);
+
+            if let Ok(mesh) = Mesh::new(&vertices, &Cuboid::generate_indices(vertices.len())) {
+                let material = &materials.0[1]; // primitive
+                material.bind();
+                material.set_uniform(c"projection", UniformValue::Mat4(projection));
+                material.set_uniform(c"view", UniformValue::Mat4(view));
+                material.set_uniform(
+                    c"model",
+                    UniformValue::Mat4(Mat4::from_translation(pos.as_vec3())),
+                );
+                let mut size = 0;
+                gl::BindBuffer(gl::ARRAY_BUFFER, mesh.vbo);
+                gl::GetBufferParameteriv(gl::ARRAY_BUFFER, gl::BUFFER_SIZE, &mut size);
+                gl::BindVertexArray(mesh.vao);
+                gl::DrawArrays(gl::LINES, 0, vertices.len() as GLint);
+
+                #[cfg(debug_assertions)]
+                {
+                    debug_info.triangles += (size as usize / size_of::<glfw::Key>()) / 3;
+                    debug_info.draw_calls += 1;
+                }
+            }
+            gl::LineWidth(1.0);
+        }
 
         if game_settings.wireframe {
             gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE);

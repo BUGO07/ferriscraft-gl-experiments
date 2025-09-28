@@ -52,6 +52,7 @@ pub fn world_plugin(app: &mut App) {
 pub struct WorldData {
     pub chunks: Arc<RwLock<HashMap<IVec3, Chunk>>>,
     pub loading_chunks: Arc<RwLock<HashSet<IVec3>>>,
+    pub highlighted_block: Option<IVec3>,
 }
 
 #[derive(Resource, Clone)]
